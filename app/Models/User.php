@@ -5,6 +5,8 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Models\Concerns\HasMarketingPermissions;
 use Database\Factories\UserFactory;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,7 +20,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 
 #[Fillable(['name', 'email', 'password', 'marketing_role_id'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
-class User extends Authenticatable implements PasskeyUser
+class User extends Authenticatable implements FilamentUser, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasMarketingPermissions, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
@@ -26,6 +28,15 @@ class User extends Authenticatable implements PasskeyUser
     public function marketingRole(): BelongsTo
     {
         return $this->belongsTo(MarketingRole::class);
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        if ($panel->getId() !== 'marketing') {
+            return false;
+        }
+
+        return $this->canManageMarketingOperations();
     }
 
     /**

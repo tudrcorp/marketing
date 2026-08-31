@@ -5,20 +5,21 @@ use Tests\Concerns\SafeRefreshDatabase;
 uses(SafeRefreshDatabase::class);
 
 use App\Filament\Pages\EditorialCalendar;
-use App\Filament\Resources\EditorialPublications\Schemas\EditorialPublicationCalendarForm;
 use App\Filament\Resources\EditorialPublications\Pages\CreateEditorialPublication;
+use App\Filament\Resources\EditorialPublications\Schemas\EditorialPublicationCalendarForm;
 use App\Filament\Resources\MarketingRoles\Pages\EditMarketingRole;
 use App\Filament\Resources\MarketingRoles\Pages\ListMarketingRoles;
-use Filament\Facades\Filament;
-use Livewire\Livewire;
 use App\Marketing\MarketingPermission;
 use App\Marketing\PublicationStatus;
+use App\Marketing\SocialPlatform;
 use App\Models\EditorialPublication;
 use App\Models\MarketingRole;
 use App\Models\SocialAccount;
 use App\Models\User;
 use Database\Seeders\MarketingAdministratorSeeder;
 use Database\Seeders\MarketingRoleSeeder;
+use Filament\Facades\Filament;
+use Livewire\Livewire;
 
 beforeEach(function () {
     $this->seed(MarketingRoleSeeder::class);
@@ -50,6 +51,18 @@ test('marketing administrator seeder creates admin user with marketing role', fu
 test('marketing roles seeder creates system roles', function () {
     expect(MarketingRole::query()->where('slug', 'administrador')->exists())->toBeTrue()
         ->and(MarketingRole::query()->where('slug', 'visor')->exists())->toBeTrue();
+});
+
+test('users with a marketing role can access the marketing panel', function () {
+    $user = marketingUserWithPermissions([MarketingPermission::ViewCalendar]);
+
+    expect($user->canAccessPanel(Filament::getPanel('marketing')))->toBeTrue();
+});
+
+test('users without a marketing role cannot access the marketing panel', function () {
+    $user = User::factory()->create(['marketing_role_id' => null]);
+
+    expect($user->canAccessPanel(Filament::getPanel('marketing')))->toBeFalse();
 });
 
 test('administrator can list marketing roles with permission counts', function () {
@@ -189,10 +202,10 @@ test('calendar day cells show social platform icons for scheduled publications',
 
     $date = now()->addDays(5)->startOfDay();
     $instagramAccount = SocialAccount::factory()->create([
-        'platform' => \App\Marketing\SocialPlatform::Instagram,
+        'platform' => SocialPlatform::Instagram,
     ]);
     $facebookAccount = SocialAccount::factory()->create([
-        'platform' => \App\Marketing\SocialPlatform::Facebook,
+        'platform' => SocialPlatform::Facebook,
     ]);
 
     EditorialPublication::factory()->create([
