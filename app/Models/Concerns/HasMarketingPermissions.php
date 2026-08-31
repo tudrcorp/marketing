@@ -26,4 +26,18 @@ trait HasMarketingPermissions
     {
         return $this->marketingRole?->slug === 'administrador';
     }
+
+    public function isLastMarketingAdministrator(): bool
+    {
+        if (! $this->isMarketingAdministrator()) {
+            return false;
+        }
+
+        return static::query()
+            ->whereKeyNot($this->getKey())
+            ->whereHas('marketingRole', function ($query): void {
+                $query->where('slug', 'administrador');
+            })
+            ->doesntExist();
+    }
 }
