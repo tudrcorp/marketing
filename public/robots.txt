@@ -1,2 +1,8 @@
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /marketing
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /livewire/
+
+Sitemap: https://marketing.tudrgroup.com/sitemap.xml

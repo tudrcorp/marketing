@@ -14,6 +14,8 @@ export default defineConfig({
                 'resources/js/passkeys.js',
                 'resources/css/filament/marketing/theme.css',
                 'resources/css/event-registration.css',
+                'resources/css/welcome.css',
+                'resources/js/welcome.js',
             ],
             refresh: true,
             fonts: [

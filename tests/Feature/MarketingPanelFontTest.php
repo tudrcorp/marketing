@@ -17,9 +17,13 @@ it('uses IBM Plex Sans and IBM Plex Mono in the marketing panel', function () {
 it('self-hosts IBM Plex instead of loading bunny cdn on the public registration page', function () {
     expect(file_get_contents(resource_path('views/layouts/event-registration.blade.php')))
         ->not->toContain('fonts.bunny.net')
+        ->and(file_get_contents(resource_path('views/welcome.blade.php')))
+        ->not->toContain('fonts.bunny.net')
         ->and(file_get_contents(base_path('vite.config.js')))
         ->toContain("bunny('IBM Plex Sans'")
-        ->toContain("bunny('IBM Plex Mono'");
+        ->toContain("bunny('IBM Plex Mono'")
+        ->toContain('resources/css/welcome.css')
+        ->toContain('resources/js/welcome.js');
 });
 
 it('uses the brand palettes in the marketing panel', function () {
