@@ -78,6 +78,17 @@ test('extracts the addresses that failed so the retry skips the ones already sen
     expect($addresses)->toBe(['uno@example.com', 'dos@example.com', 'tres@example.com']);
 });
 
+test('classifies gmail bandwidth and unusual usage as quota so the circuit opens', function (string $message) {
+    expect($this->classifier->classify(502, $message))
+        ->toBe(EmailDispatchFailureKind::QuotaExceeded)
+        ->and(EmailDispatchFailureKind::QuotaExceeded->shouldTripCircuit())->toBeTrue();
+})->with([
+    'Límite de ancho de banda de Gmail para las cargas por medio de la Web',
+    'Gmail bandwidth limit for web uploads',
+    'Account disabled due to unusual usage',
+    'Uso inusual de la cuenta',
+]);
+
 test('quota cooldown is long and transient cooldown grows with each attempt', function () {
     config()->set('services.marketing_api.mass_email_quota_cooldown_minutes', 60);
 

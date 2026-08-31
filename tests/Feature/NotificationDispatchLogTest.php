@@ -52,6 +52,18 @@ test('failure resolver translates gmail address not found bounce for analysts', 
         ->and($guidance['resolution_steps'])->toContain('tipeo');
 });
 
+test('failure resolver treats gmail bandwidth lock as the same pause as daily quota', function () {
+    $guidance = app(NotificationDispatchFailureResolver::class)->resolve(
+        status: NotificationDispatchStatus::Failed,
+        technicalMessage: 'Límite de ancho de banda de Gmail para las cargas por medio de la Web',
+        channel: BirthdayNotificationChannel::Email,
+    );
+
+    expect($guidance['failure_code'])->toBe('email_quota_exceeded')
+        ->and($guidance['analyst_message'])->toContain('ancho de banda')
+        ->and($guidance['resolution_steps'])->toContain('NO relances');
+});
+
 test('persist job stores analyst friendly guidance', function () {
     $user = User::factory()->create();
 

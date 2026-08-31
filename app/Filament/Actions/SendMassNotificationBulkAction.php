@@ -7,6 +7,7 @@ use App\Filament\Widgets\MarketingDispatchProgressFloaterWidget;
 use App\Marketing\BirthdayNotificationAudience;
 use App\Models\MassNotification;
 use App\Models\User;
+use App\Services\Marketing\MassEmailDispatchPace;
 use App\Services\Marketing\MassNotificationDispatchService;
 use Filament\Actions\BulkAction;
 use Filament\Notifications\Notification;
@@ -24,13 +25,18 @@ class SendMassNotificationBulkAction
             ->icon(Heroicon::OutlinedPaperAirplane)
             ->color('primary')
             ->modalHeading('Enviar notificación masiva')
-            ->modalDescription(fn (BulkAction $action): string => 'Configura el mensaje que recibirán '
-                .$action->getSelectedRecords()->count()
-                .' destinatario'
-                .($action->getSelectedRecords()->count() === 1 ? '' : 's')
-                .' seleccionado'
-                .($action->getSelectedRecords()->count() === 1 ? '' : 's')
-                .'.')
+            ->modalDescription(function (BulkAction $action): string {
+                $count = $action->getSelectedRecords()->count();
+
+                return 'Configura el mensaje que recibirán '
+                    .$count
+                    .' destinatario'
+                    .($count === 1 ? '' : 's')
+                    .' seleccionado'
+                    .($count === 1 ? '' : 's')
+                    .'. '
+                    .MassEmailDispatchPace::analystWarning($count);
+            })
             ->modalIcon(Heroicon::OutlinedBellAlert)
             ->modalIconColor('gray')
             ->modalSubmitActionLabel('Enviar notificación')

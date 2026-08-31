@@ -3,9 +3,11 @@
 namespace App\Filament\Resources\MassNotifications\Actions;
 
 use App\Filament\Widgets\MarketingDispatchProgressFloaterWidget;
+use App\Marketing\BirthdayNotificationChannel;
 use App\Models\MassNotification;
 use App\Models\User;
 use App\Services\Marketing\DispatchProgressTracker;
+use App\Services\Marketing\MassEmailDispatchPace;
 use App\Services\Marketing\MassNotificationDispatchService;
 use App\Services\Marketing\QueueWorkerHealthInspector;
 use Filament\Actions\Action;
@@ -23,9 +25,17 @@ class SendMassNotificationAction
             ->color('primary')
             ->requiresConfirmation()
             ->modalHeading('Ejecutar envío masivo')
-            ->modalDescription(fn (MassNotification $record): string => 'Se enviará «'.$record->title.'» por '
-                .collect($record->channelEnums())->map->getLabel()->join(', ')
-                .' a los grupos/destinatarios configurados. El resultado quedará en el historial de envíos.')
+            ->modalDescription(function (MassNotification $record): string {
+                $description = 'Se enviará «'.$record->title.'» por '
+                    .collect($record->channelEnums())->map->getLabel()->join(', ')
+                    .' a los grupos/destinatarios configurados. El resultado quedará en el historial de envíos.';
+
+                if (! in_array(BirthdayNotificationChannel::Email, $record->channelEnums(), true)) {
+                    return $description;
+                }
+
+                return $description.' '.MassEmailDispatchPace::analystWarning();
+            })
             ->modalSubmitActionLabel('Sí, enviar ahora')
             ->visible(fn (MassNotification $record): bool => Gate::check('send', $record)
                 && filled($record->copy)

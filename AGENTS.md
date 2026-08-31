@@ -118,8 +118,8 @@ MARKETING_API_MASS_SEND_BATCH_PATH=/api/notifications/mass/send-batch
 MARKETING_API_BIRTHDAY_TEST_SEND_PATH=/api/notifications/birthday/test
 MARKETING_API_MASS_SEND_PATH=/api/notifications/mass/send   # configurado en config/services.php pero NO se usa en ningún servicio/job de la app
 MARKETING_BIRTHDAY_EMAIL_BATCH_SIZE=50
-MARKETING_MASS_EMAIL_BATCH_SIZE=50
-MARKETING_MASS_EMAIL_BATCH_PAUSE_SECONDS=5
+MARKETING_MASS_EMAIL_BATCH_SIZE=15
+MARKETING_MASS_EMAIL_BATCH_PAUSE_SECONDS=30
 MARKETING_MASS_EMAIL_QUOTA_COOLDOWN_MINUTES=60
 MARKETING_MASS_EMAIL_AUTH_COOLDOWN_MINUTES=15
 MARKETING_WHATSAPP_BATCH_SIZE=50
@@ -267,14 +267,14 @@ Para evitar que vuelva a pasar en silencio, `QueueWorkerHealthInspector` comprue
 
 ### Diagnóstico: «el envío se detuvo a mitad» (cuota del proveedor de correo)
 
-Si el historial muestra los primeros lotes en *Enviado* y el resto con `550 5.4.5 Daily user sending limit exceeded` o `454 4.7.0 Too many login attempts`, **no es un fallo de la app ni de los destinatarios**: la cuenta remitente agotó su cuota diaria (Gmail gratuito ≈ 500 correos/24 h; Workspace ≈ 2.000, en ventana móvil, no por día calendario). El 454 suele ser la secuela del 550: al cortar el proveedor, el pool SMTP se reabre y cada reconexión cuenta como intento de login.
+Si el historial muestra los primeros lotes en *Enviado* y el resto con `550 5.4.5 Daily user sending limit exceeded`, `454 4.7.0 Too many login attempts` o el aviso de Google Admin de *límite de ancho de banda / cargas por la Web*, **no es un fallo de la app ni de los destinatarios**: la cuenta remitente chocó contra un tope de Gmail (cuota diaria ≈ 500/2.000 en ventana móvil, o ráfaga de HTML+adjuntos). El 454 suele ser la secuela: al cortar el proveedor, el pool SMTP se reabre y cada reconexión cuenta como intento de login.
 
 Qué hace la app por sí sola desde entonces (no hay que relanzar la campaña):
 
 - `EmailDispatchFailureClassifier` traduce la respuesta del API a `EmailDispatchFailureKind` (cuota, auth, temporal, permanente). El código SMTP puede venir solo dentro de `failures[]` cuando el envío fue parcial (HTTP 207), por eso se clasifica el texto compuesto.
 - `MassEmailCircuitBreaker` (caché, como el latido de `QueueWorkerHealthInspector`) abre un freno global del canal correo ante cuota o bloqueo de auth. Los lotes pendientes se reprograman **sin llamar al API**, en vez de quemarse en cadena.
 - `SendMassNotificationEmailBatchJob` no usa `release()`: reencola una **copia con los destinatarios que faltaban** (`reschedule()`), porque `release()` reencola el payload original y volvería a escribir a quienes ya recibieron el correo. Tope de 6 intentos y 24 esperas por freno.
-- Los lotes salen escalonados (`mass_email_batch_pause_seconds`), igual que WhatsApp.
+- Los lotes salen escalonados (`mass_email_batch_size` 15 + `mass_email_batch_pause_seconds` 30). En `integracorp-api` cada correo del lote sale de a uno con `EMAIL_SEND_PAUSE_MS` (1,5 s).
 
 **Nunca relances una campaña que quedó a medias**: los lotes pendientes se reanudan solos y un envío nuevo duplica los correos ya entregados. Del lado de `integracorp-api`, `email.service.js` corta el lote en cuanto detecta un bloqueo del remitente y devuelve los pendientes en `failures[]`, que es justo lo que esta app usa para reintentar solo esas direcciones.
 
@@ -282,7 +282,7 @@ Qué hace la app por sí sola desde entonces (no hay que relanzar la campaña):
 
 Síntoma: el worker muestra `SendMassNotificationEmailBatchJob ... RUNNING` y muere con `ProcessTimedOutException` (proceso hijo de `queue:listen`) o `TimeoutExceededException` en `failed_jobs`, siempre a los ~60 s.
 
-Un lote de correo tarda minutos **por diseño**: son hasta `mass_email_batch_size` (50) destinatarios en un único POST a `/api/emails/bulk`, y el API entrega por SMTP antes de responder — por eso el cliente HTTP espera hasta `MARKETING_API_EMAIL_TIMEOUT` (300 s). Los tres jobs de correo declaran `$timeout = email_timeout + 60` para que el worker les dé ese margen, pero **`queue:listen` ignora el `$timeout` del job**: el proceso padre mata al hijo a los segundos de su propio `--timeout` (60 por defecto). Levanta el worker con `composer run queue` (o `composer run dev`), que pasan `--timeout=0`; un `php artisan queue:listen` a secas reproduce el fallo.
+Un lote de correo tarda minutos **por diseño**: son hasta `mass_email_batch_size` (15) destinatarios en un único POST a `/api/emails/bulk`, y el API entrega por SMTP de a uno (con pausa) antes de responder — por eso el cliente HTTP espera hasta `MARKETING_API_EMAIL_TIMEOUT` (300 s). Los tres jobs de correo declaran `$timeout = email_timeout + 60` para que el worker les dé ese margen, pero **`queue:listen` ignora el `$timeout` del job**: el proceso padre mata al hijo a los segundos de su propio `--timeout` (60 por defecto). Levanta el worker con `composer run queue` (o `composer run dev`), que pasan `--timeout=0`; un `php artisan queue:listen` a secas reproduce el fallo.
 
 Cuando el job muere por timeout no corre **nada** del manejo de errores: ni la traza de `MarketingApiTraceRecorder`, ni el log de despacho, ni el `MassEmailCircuitBreaker`, ni el `reschedule()` de pendientes. Pero el POST ya llegó al API, que sigue enviando. Por eso **no hagas `queue:retry` de esos lotes**: los correos probablemente salieron y los duplicarías (es también la razón del `$tries = 1`).
 

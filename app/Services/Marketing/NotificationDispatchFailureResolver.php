@@ -76,13 +76,19 @@ class NotificationDispatchFailureResolver
             str_contains($message, '5.4.5'),
             str_contains($message, 'daily user sending limit'),
             str_contains($message, 'sending limit exceeded'),
-            str_contains($message, 'cuota diaria de correo agotada') => $this->guidance(
+            str_contains($message, 'cuota diaria de correo agotada'),
+            str_contains($message, 'bandwidth'),
+            str_contains($message, 'ancho de banda'),
+            str_contains($message, 'unusual usage'),
+            str_contains($message, 'uso inusual'),
+            str_contains($message, 'web upload'),
+            str_contains($message, 'cargas por medio de la web') => $this->guidance(
                 'email_quota_exceeded',
-                'Se agotó la cuota diaria de envío del proveedor de correo. No es un problema de los destinatarios ni del contenido: la cuenta remitente llegó a su tope de correos por día.',
-                "1. NO relances la campaña: los lotes pendientes se reintentan solos cuando entra cuota nueva, y un envío manual duplicaría los correos ya entregados.\n"
+                'Gmail/Workspace cortó el envío (cuota diaria o límite de ancho de banda). No es un problema de los destinatarios ni del contenido: la cuenta remitente quedó en pausa.',
+                "1. NO relances la campaña: los lotes pendientes se reintentan solos cuando Google levante el freno, y un envío manual duplicaría los correos ya entregados.\n"
                     ."2. Revisa en este historial cuántos destinatarios quedaron pendientes y a qué hora está previsto el próximo intento.\n"
-                    ."3. Gmail y Workspace miden una ventana móvil de 24 h: la cuota se libera de a poco, no a medianoche.\n"
-                    ."4. Si esto se repite con cada campaña, la cuenta remitente se quedó corta para el volumen y hay que subir el plan o mover el envío a un proveedor transaccional.",
+                    ."3. Gmail y Workspace miden una ventana móvil (cuota ~24 h; ancho de banda suele pedir ~1 h): se libera de a poco, no a medianoche.\n"
+                    .'4. Si esto se repite con cada campaña, baja el ritmo (lotes más chicos) o mueve el envío a un proveedor transaccional.',
             ),
             str_contains($message, '454'),
             str_contains($message, 'too many login attempts'),
@@ -93,7 +99,7 @@ class NotificationDispatchFailureResolver
                 "1. NO relances la campaña: cada reenvío añade más intentos de login y alarga el bloqueo.\n"
                     ."2. Los lotes pendientes ya quedaron reprogramados y se reanudan solos.\n"
                     ."3. Si al reanudarse vuelve a fallar, confirma que la contraseña de aplicación del remitente siga vigente en el API.\n"
-                    ."4. Revisa antes si hubo un error de cuota (550 5.4.5) en los lotes previos: esa suele ser la causa de fondo.",
+                    .'4. Revisa antes si hubo un error de cuota (550 5.4.5) en los lotes previos: esa suele ser la causa de fondo.',
             ),
             str_contains($message, '550 5.1.1'),
             str_contains($message, '5.1.1'),

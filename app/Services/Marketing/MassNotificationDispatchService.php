@@ -557,7 +557,7 @@ class MassNotificationDispatchService
         NotificationDispatchSource $source,
         string $dispatchRunId,
     ): MassNotificationChannelResult {
-        $batchSize = max(1, (int) config('services.marketing_api.mass_email_batch_size', 50));
+        $batchSize = MassEmailDispatchPace::batchSize();
         $batches = array_chunk($emails, $batchSize);
         $totalBatches = count($batches);
         $copy = app(MassNotificationEmailRenderer::class)->render(
@@ -576,7 +576,7 @@ class MassNotificationDispatchService
         // proveedor SMTP dispara sus límites de conexión y de cuota (ver el 550 5.4.5 /
         // 454 que tumbó una campaña completa). Es el equivalente de la pausa que ya
         // aplica WhatsApp entre lotes.
-        $pauseSeconds = max(0, (int) config('services.marketing_api.mass_email_batch_pause_seconds', 5));
+        $pauseSeconds = MassEmailDispatchPace::pauseSeconds();
 
         foreach ($batches as $index => $batchEmails) {
             $pendingBatch = SendMassNotificationEmailBatchJob::dispatch(
@@ -848,5 +848,4 @@ class MassNotificationDispatchService
             totalRecipients: $recipientCount,
         );
     }
-
 }

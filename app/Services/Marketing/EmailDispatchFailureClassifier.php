@@ -27,6 +27,12 @@ class EmailDispatchFailureClassifier
             'quota exceeded',
             'límite diario',
             'limite diario',
+            'bandwidth',
+            'ancho de banda',
+            'unusual usage',
+            'uso inusual',
+            'web upload',
+            'cargas por medio de la web',
         ])) {
             return EmailDispatchFailureKind::QuotaExceeded;
         }
