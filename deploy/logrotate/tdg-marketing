@@ -1,0 +1,24 @@
+/var/www/tdg-marketing/storage/logs/*.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    sharedscripts
+    su deploy deploy
+    create 0640 deploy deploy
+}
+
+/var/log/php8.4-fpm-tdg-*.log {
+    weekly
+    missingok
+    rotate 8
+    compress
+    delaycompress
+    notifempty
+    sharedscripts
+    postrotate
+        systemctl reload php8.4-fpm >/dev/null 2>&1 || true
+    endscript
+}
