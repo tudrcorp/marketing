@@ -4,16 +4,17 @@ namespace App\Providers\Filament;
 
 use App\Filament\Auth\Pages\Login;
 use App\Filament\Pages\Dashboard;
+use Filament\Enums\ThemeMode;
 use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\Authenticate;
-use Filament\Support\Facades\FilamentView;
-use Filament\View\PanelsRenderHook;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Enums\Width;
+use Filament\Support\Facades\FilamentView;
+use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -119,8 +120,10 @@ class MarketingPanelProvider extends PanelProvider
             ->breadcrumbs(false)
             ->globalSearch(false)
             ->maxContentWidth(Width::Full)
+            ->defaultThemeMode(ThemeMode::Dark)
             ->navigationGroups([
                 'Operaciones',
+                'Contenido',
                 'Audiencias TDG',
                 'Administración',
             ])

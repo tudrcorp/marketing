@@ -36,6 +36,14 @@ class MarketingPermission
 
     public const ManageClientGroups = 'client_groups.manage';
 
+    public const ViewBrands = 'content_brands.view';
+
+    public const ManageBrands = 'content_brands.manage';
+
+    public const ViewContentPosts = 'content_posts.view';
+
+    public const ManageContentPosts = 'content_posts.manage';
+
     /**
      * @return array<string, string>
      */
@@ -58,6 +66,10 @@ class MarketingPermission
             self::ViewNotificationLogs => 'Ver historial de envíos y fallas',
             self::ViewClientGroups => 'Ver grupos de clientes',
             self::ManageClientGroups => 'Administrar grupos de clientes',
+            self::ViewBrands => 'Ver marcas',
+            self::ManageBrands => 'Administrar marcas',
+            self::ViewContentPosts => 'Ver tablero de contenido',
+            self::ManageContentPosts => 'Administrar contenido multimarca',
         ];
     }
 
@@ -83,6 +95,10 @@ class MarketingPermission
             self::ViewNotificationLogs => 'Auditar entregas, fallos y trazas del API.',
             self::ViewClientGroups => 'Consultar grupos de clientes y responsables.',
             self::ManageClientGroups => 'Registrar clientes y administrar audiencias.',
+            self::ViewBrands => 'Consultar la ficha y los recursos fijos de cada marca.',
+            self::ManageBrands => 'Crear y editar marcas, bóveda de CTAs, hashtags y enlaces.',
+            self::ViewContentPosts => 'Acceder al panel máster, Kanban y calendario de contenido.',
+            self::ManageContentPosts => 'Crear, mover y reprogramar piezas de contenido.',
         ];
     }
 
@@ -161,6 +177,18 @@ class MarketingPermission
                 permissions: [
                     self::ViewClientGroups,
                     self::ManageClientGroups,
+                ],
+            ),
+            $buildGroup(
+                key: 'content',
+                label: 'Contenido multimarca',
+                description: 'Marcas, tablero Kanban y calendario de producción de contenido.',
+                icon: 'heroicon-o-squares-2x2',
+                permissions: [
+                    self::ViewBrands,
+                    self::ManageBrands,
+                    self::ViewContentPosts,
+                    self::ManageContentPosts,
                 ],
             ),
             $buildGroup(

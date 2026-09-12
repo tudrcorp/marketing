@@ -74,7 +74,7 @@ test('administrator can list marketing roles with permission counts', function (
     Livewire::test(ListMarketingRoles::class)
         ->assertOk()
         ->assertSee('Administrador de marketing')
-        ->assertSee('16 permisos');
+        ->assertSee('20 permisos');
 });
 
 test('marketing role form renders grouped permissions picker', function () {

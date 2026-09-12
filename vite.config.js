@@ -16,6 +16,7 @@ export default defineConfig({
                 'resources/css/event-registration.css',
                 'resources/css/welcome.css',
                 'resources/js/welcome.js',
+                'resources/js/content-hub.js',
             ],
             refresh: true,
             fonts: [
