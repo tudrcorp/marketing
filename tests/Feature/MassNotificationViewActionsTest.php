@@ -2,7 +2,7 @@
 
 use App\Filament\Resources\MassNotifications\Pages\CreateMassNotification;
 use App\Filament\Resources\MassNotifications\Pages\ViewMassNotification;
-use App\Jobs\SendMassNotificationEmailBatchJob;
+use App\Jobs\SendMassNotificationCampaignJob;
 use App\Marketing\BirthdayNotificationAudience;
 use App\Marketing\BirthdayNotificationChannel;
 use App\Marketing\MarketingPermission;
@@ -70,9 +70,20 @@ function fakeCollaboratorsApi(): void
                 'total' => 3,
             ],
         ], 200),
-        '*/api/emails/bulk' => Http::response([
+        '*/api/emails/campaigns/*' => Http::response([
             'success' => true,
-            'message' => 'Envío realizado',
+            'campaign_id' => 'camp_test',
+            'emails_sent' => 3,
+            'opens' => 0,
+            'clicks' => 0,
+            'bounces' => ['hard' => 0, 'soft' => 0],
+            'unsubscribed' => 0,
+            'events' => [],
+        ], 200),
+        '*/api/emails/campaigns' => Http::response([
+            'success' => true,
+            'campaign_id' => 'camp_test',
+            'message' => 'Mailchimp aceptó la campaña.',
             'sent' => 3,
             'total' => 3,
         ], 200),
@@ -103,12 +114,14 @@ test('dispatch existing sends email to configured recipient ids', function () {
         ->and($result->allSuccessful())->toBeTrue();
 
     Http::assertSent(function ($request): bool {
-        $body = $request->body();
+        $recipients = $request['recipients'] ?? [];
 
-        return str_ends_with($request->url(), '/api/emails/bulk')
-            && str_contains($body, 'aaular@tudrencasa.com')
-            && str_contains($body, 'gcamacho@tudrencasa.com')
-            && str_contains($body, 'marketing@tudrencasa.com');
+        return str_contains($request->url(), '/api/emails/campaigns')
+            && $request->method() === 'POST'
+            && is_array($recipients)
+            && in_array('aaular@tudrencasa.com', $recipients, true)
+            && in_array('gcamacho@tudrencasa.com', $recipients, true)
+            && in_array('marketing@tudrencasa.com', $recipients, true);
     });
 
     app()->terminate();
@@ -298,12 +311,12 @@ test('view page shows send actions and delivery summary', function () {
         ->callAction('sendMassNotification')
         ->assertNotified();
 
-    Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/api/emails/bulk'));
+    Http::assertSent(fn ($request): bool => $request->method() === 'POST' && str_contains($request->url(), '/api/emails/campaigns'));
 });
 
 test('send action is disabled and blocks duplicate dispatch while a previous run is still active', function () {
     fakeCollaboratorsApi();
-    Queue::fake([SendMassNotificationEmailBatchJob::class]);
+    Queue::fake([SendMassNotificationCampaignJob::class]);
 
     $user = massViewActionsUser([
         MarketingPermission::ViewMassNotifications,
@@ -329,7 +342,7 @@ test('send action is disabled and blocks duplicate dispatch while a previous run
         // por lo que un segundo click no vuelve a ejecutar el closure de envío.
         ->callAction('sendMassNotification');
 
-    Queue::assertPushed(SendMassNotificationEmailBatchJob::class, 1);
+    Queue::assertPushed(SendMassNotificationCampaignJob::class, 1);
 });
 
 test('create mass notification redirects to view for sending', function () {
@@ -436,7 +449,7 @@ test('delivery summary counts processed batches without double counting the queu
 
 test('send action refuses to queue a dispatch when no queue worker is running', function () {
     fakeCollaboratorsApi();
-    Queue::fake([SendMassNotificationEmailBatchJob::class]);
+    Queue::fake([SendMassNotificationCampaignJob::class]);
 
     // Sin latido de worker y con una conexión asíncrona, encolar dejaría el envío muerto.
     config()->set('queue.default', 'database');

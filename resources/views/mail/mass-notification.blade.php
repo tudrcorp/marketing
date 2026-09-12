@@ -13,7 +13,7 @@
                     <tr>
                         <td style="background-color:#2d3250;padding:32px;text-align:center;">
                             <img
-                                src="cid:company-logo"
+                                src="{{ $logoUrl }}"
                                 alt="Tu Doctor Group"
                                 width="200"
                                 style="display:block;margin:0 auto;max-width:200px;height:auto;border:0;"
@@ -33,14 +33,22 @@
                         </tr>
                     @endif
 
-                    @if ($useEmbeddedImage)
+                    @if ($useHostedImage && filled($imageUrl))
                         <tr>
                             <td style="padding:0 32px 32px;">
                                 <img
-                                    src="cid:campaign-image"
+                                    src="{{ $imageUrl }}"
                                     alt="Adjunto de la campaña"
                                     style="display:block;width:100%;max-width:536px;height:auto;border-radius:12px;border:0;"
                                 >
+                            </td>
+                        </tr>
+                    @endif
+
+                    @if (filled($attachmentUrl) && ! $useHostedImage)
+                        <tr>
+                            <td style="padding:0 32px 32px;font-size:16px;line-height:1.7;color:#4b516f;text-align:center;">
+                                <a href="{{ $attachmentUrl }}" style="color:#e87722;font-weight:600;">Descargar adjunto de la campaña</a>
                             </td>
                         </tr>
                     @endif
@@ -49,6 +57,16 @@
                         <td style="padding:24px 32px;background-color:#f7f8fc;border-top:1px solid #e4e7f1;font-size:13px;line-height:1.6;color:#6b7190;text-align:center;">
                             Mensaje enviado por <strong>Tu Doctor Group</strong>.
                             Campaña preparada por <strong>el Departamento Comercial</strong>.
+                            <br><br>
+                            @if ($forTransactional ?? false)
+                                Este es un envío de prueba. El enlace de baja y la dirección fiscal los inserta Mailchimp en la campaña real.
+                                <br>
+                                Tu Doctor Group LLC, Centro Lido 12, Caracas, Venezuela.
+                            @else
+                                Si no deseas recibir estos correos, puedes <a href="*|UNSUB|*" style="color:#6b7190;">darte de baja</a>.
+                                <br>
+                                *|LIST:ADDRESS|*
+                            @endif
                         </td>
                     </tr>
                 </table>

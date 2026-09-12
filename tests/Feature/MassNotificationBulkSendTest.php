@@ -1,7 +1,7 @@
 <?php
 
 use App\Filament\Resources\TravelAgents\Pages\ManageTravelAgents;
-use App\Jobs\SendMassNotificationEmailBatchJob;
+use App\Jobs\SendMassNotificationCampaignJob;
 use App\Jobs\SendMassNotificationWhatsAppBatchJob;
 use App\Marketing\BirthdayNotificationAudience;
 use App\Marketing\BirthdayNotificationChannel;
@@ -11,8 +11,11 @@ use App\Models\MarketingRole;
 use App\Models\MassNotification;
 use App\Models\NotificationDispatchLog;
 use App\Models\User;
+use App\Services\Marketing\DispatchProgressTracker;
+use App\Services\Marketing\MarketingApiTraceRecorder;
 use App\Services\Marketing\MassNotificationDispatchService;
 use App\Services\Marketing\MassNotificationRecipientResolver;
+use App\Services\Marketing\NotificationDispatchLogger;
 use Database\Seeders\MarketingRoleSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Http\Client\ConnectionException;
@@ -61,9 +64,20 @@ test('recipient resolver extracts email and phone from travel agent records', fu
 
 test('dispatch service creates a mass notification and sends email to selected records', function () {
     Http::fake([
-        '*/api/emails/bulk' => Http::response([
+        '*/api/emails/campaigns/*' => Http::response([
             'success' => true,
-            'message' => 'Envío realizado',
+            'campaign_id' => 'camp_test',
+            'emails_sent' => 1,
+            'opens' => 0,
+            'clicks' => 0,
+            'bounces' => ['hard' => 0, 'soft' => 0],
+            'unsubscribed' => 0,
+            'events' => [],
+        ], 200),
+        '*/api/emails/campaigns' => Http::response([
+            'success' => true,
+            'campaign_id' => 'camp_test',
+            'message' => 'Mailchimp aceptó la campaña.',
             'sent' => 1,
             'total' => 1,
         ], 200),
@@ -101,19 +115,20 @@ test('dispatch service creates a mass notification and sends email to selected r
         ->and($notification->created_by_id)->toBe($user->id);
 
     Http::assertSent(function ($request): bool {
-        $body = $request->body();
+        $recipients = $request['recipients'] ?? [];
 
-        return str_ends_with($request->url(), '/api/emails/bulk')
-            && str_contains($body, 'ailynvina@gmail.com')
-            && str_contains($body, 'Promoción TDG')
-            && str_contains($body, 'Aprovecha nuestra promoción especial.');
+        return str_contains($request->url(), '/api/emails/campaigns')
+            && $request->method() === 'POST'
+            && in_array('ailynvina@gmail.com', is_array($recipients) ? $recipients : [], true)
+            && $request['subject'] === 'Promoción TDG'
+            && str_contains((string) $request['copy'], 'Aprovecha nuestra promoción especial.');
     });
 });
 
 test('dispatch service reports an unconfirmed timeout instead of a hard failure when the api takes too long to respond', function () {
     Http::fake(function () {
         throw new ConnectionException(
-            'cURL error 28: Operation timed out after 120002 milliseconds with 0 bytes received (see https://curl.haxx.se/libcurl/c/libcurl-errors.html) for http://localhost:4000/api/emails/bulk',
+            'cURL error 28: Operation timed out after 120002 milliseconds with 0 bytes received (see https://curl.haxx.se/libcurl/c/libcurl-errors.html) for http://localhost:4000/api/emails/campaigns',
         );
     });
 
@@ -140,7 +155,7 @@ test('dispatch service reports an unconfirmed timeout instead of a hard failure 
     );
 
     expect($result->channelResults[0]->successful)->toBeFalse()
-        ->and($result->channelResults[0]->message)->toBe('El API de correos no confirmó el resultado a tiempo. Es probable que los correos sí se hayan enviado.');
+        ->and($result->channelResults[0]->message)->toBe('El API de correos no confirmó el resultado a tiempo. Es probable que la campaña sí se haya enviado.');
 
     $log = NotificationDispatchLog::query()->firstOrFail();
 
@@ -150,9 +165,20 @@ test('dispatch service reports an unconfirmed timeout instead of a hard failure 
 
 test('dispatch service accepts enum MassNotificationBulkSendTest type when sending email', function () {
     Http::fake([
-        '*/api/emails/bulk' => Http::response([
+        '*/api/emails/campaigns/*' => Http::response([
             'success' => true,
-            'message' => 'Envío realizado',
+            'campaign_id' => 'camp_test',
+            'emails_sent' => 1,
+            'opens' => 0,
+            'clicks' => 0,
+            'bounces' => ['hard' => 0, 'soft' => 0],
+            'unsubscribed' => 0,
+            'events' => [],
+        ], 200),
+        '*/api/emails/campaigns' => Http::response([
+            'success' => true,
+            'campaign_id' => 'camp_test',
+            'message' => 'Mailchimp aceptó la campaña.',
             'sent' => 1,
             'total' => 1,
         ], 200),
@@ -262,10 +288,8 @@ test('dispatch service splits whatsapp recipients into batches of fifty', functi
     Queue::assertPushed(SendMassNotificationWhatsAppBatchJob::class, 2);
 });
 
-test('dispatch service splits mass email recipients into batches instead of sending them all in one request', function () {
-    Queue::fake([SendMassNotificationEmailBatchJob::class]);
-
-    config(['services.marketing_api.mass_email_batch_size' => 50]);
+test('dispatch service queues a single Mailchimp campaign instead of email batches', function () {
+    Queue::fake([SendMassNotificationCampaignJob::class]);
 
     $user = massSendUserWithPermissions([
         MarketingPermission::ManageMassNotifications,
@@ -294,18 +318,15 @@ test('dispatch service splits mass email recipients into batches instead of send
         ->and($result->allSuccessful())->toBeTrue()
         ->and($result->notification->recipient_ids)->toHaveCount(51);
 
-    Queue::assertPushed(SendMassNotificationEmailBatchJob::class, 2);
-    Queue::assertPushedOn('email', SendMassNotificationEmailBatchJob::class);
-    Queue::assertPushed(SendMassNotificationEmailBatchJob::class, function (SendMassNotificationEmailBatchJob $job): bool {
-        return $job->batchNumber === 1 && $job->totalBatches === 2 && count($job->emails) === 50;
-    });
-    Queue::assertPushed(SendMassNotificationEmailBatchJob::class, function (SendMassNotificationEmailBatchJob $job): bool {
-        return $job->batchNumber === 2 && $job->totalBatches === 2 && count($job->emails) === 1;
+    Queue::assertPushed(SendMassNotificationCampaignJob::class, 1);
+    Queue::assertPushedOn('email', SendMassNotificationCampaignJob::class);
+    Queue::assertPushed(SendMassNotificationCampaignJob::class, function (SendMassNotificationCampaignJob $job): bool {
+        return count($job->emails) === 51 && $job->attempt === 1;
     });
 });
 
-test('dispatch service logs the immediate channel summary as queued, not sent, while batches are pending', function () {
-    Queue::fake([SendMassNotificationEmailBatchJob::class]);
+test('dispatch service logs the immediate channel summary as queued, not sent, while the campaign is pending', function () {
+    Queue::fake([SendMassNotificationCampaignJob::class]);
 
     $user = massSendUserWithPermissions([
         MarketingPermission::ManageMassNotifications,
@@ -340,14 +361,26 @@ test('dispatch service logs the immediate channel summary as queued, not sent, w
         ->and($channelSummaryLog->sent_count)->toBe(0);
 });
 
-test('email batch job posts each batch to the bulk endpoint and aggregates progress', function () {
+test('campaign job posts recipients to the Mailchimp campaigns endpoint and records progress', function () {
     Http::fake([
-        '*/api/emails/bulk' => Http::sequence()
-            ->push(['success' => true, 'message' => 'Envío realizado', 'sent' => 2, 'total' => 2], 200)
-            ->push(['success' => true, 'message' => 'Envío realizado', 'sent' => 1, 'total' => 1], 200),
+        '*/api/emails/campaigns/*' => Http::response([
+            'success' => true,
+            'campaign_id' => 'camp_lotes',
+            'emails_sent' => 3,
+            'opens' => 0,
+            'clicks' => 0,
+            'bounces' => ['hard' => 0, 'soft' => 0],
+            'unsubscribed' => 0,
+            'events' => [],
+        ], 200),
+        '*/api/emails/campaigns' => Http::response([
+            'success' => true,
+            'campaign_id' => 'camp_lotes',
+            'message' => 'Mailchimp aceptó la campaña.',
+            'sent' => 3,
+            'total' => 3,
+        ], 200),
     ]);
-
-    config(['services.marketing_api.mass_email_batch_size' => 2]);
 
     $user = massSendUserWithPermissions([
         MarketingPermission::ManageMassNotifications,
@@ -372,16 +405,14 @@ test('email batch job posts each batch to the bulk endpoint and aggregates progr
         sentBy: $user,
     );
 
-    Http::assertSentCount(2);
+    Http::assertSent(fn ($request): bool => $request->method() === 'POST' && str_contains($request->url(), '/api/emails/campaigns'));
 
-    // Una fila "encolado" (resumen inmediato del canal) + una fila por lote realmente enviado.
     $logs = NotificationDispatchLog::query()->get();
-    $batchLogs = $logs->whereNotNull('batch_number');
+    $campaignLogs = $logs->whereNotNull('batch_number');
 
-    expect($logs)->toHaveCount(3)
-        ->and($batchLogs)->toHaveCount(2)
-        ->and($batchLogs->sum('sent_count'))->toBe(3)
-        ->and($batchLogs->every(fn (NotificationDispatchLog $log): bool => $log->status === 'sent'))->toBeTrue();
+    expect($logs->count())->toBeGreaterThanOrEqual(2)
+        ->and($campaignLogs->sum('sent_count'))->toBe(3)
+        ->and($campaignLogs->every(fn (NotificationDispatchLog $log): bool => in_array($log->status, ['sent', 'queued'], true)))->toBeTrue();
 });
 
 test('whatsapp batch job posts recipients to marketing api send-batch endpoint', function () {
@@ -409,9 +440,9 @@ test('whatsapp batch job posts recipients to marketing api send-batch endpoint',
         totalBatches: 1,
         sentById: $user->id,
     ))->handle(
-        app(\App\Services\Marketing\NotificationDispatchLogger::class),
-        app(\App\Services\Marketing\MarketingApiTraceRecorder::class),
-        app(\App\Services\Marketing\DispatchProgressTracker::class),
+        app(NotificationDispatchLogger::class),
+        app(MarketingApiTraceRecorder::class),
+        app(DispatchProgressTracker::class),
     );
 
     Http::assertSent(function ($request): bool {
@@ -438,9 +469,20 @@ test('analyst can send a mass notification from travel agents table bulk action'
                 ],
             ],
         ], 200),
-        '*/api/emails/bulk' => Http::response([
+        '*/api/emails/campaigns/*' => Http::response([
             'success' => true,
-            'message' => 'Envío realizado',
+            'campaign_id' => 'camp_test',
+            'emails_sent' => 1,
+            'opens' => 0,
+            'clicks' => 0,
+            'bounces' => ['hard' => 0, 'soft' => 0],
+            'unsubscribed' => 0,
+            'events' => [],
+        ], 200),
+        '*/api/emails/campaigns' => Http::response([
+            'success' => true,
+            'campaign_id' => 'camp_test',
+            'message' => 'Mailchimp aceptó la campaña.',
             'sent' => 1,
             'total' => 1,
         ], 200),

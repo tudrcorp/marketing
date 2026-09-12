@@ -46,6 +46,7 @@ test('connection resets and rate limits are transient', function (int $status, s
     [502, 'Error: read ECONNRESET'],
     [502, '421 4.7.0 Try again later'],
     [429, 'Too many requests'],
+    [429, 'Mailchimp rate limit exceeded'],
 ]);
 
 test('reads the smtp code hidden inside the failures list', function () {

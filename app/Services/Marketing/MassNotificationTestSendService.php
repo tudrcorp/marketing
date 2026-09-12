@@ -120,6 +120,7 @@ class MassNotificationTestSendService
             'copy' => app(MassNotificationEmailRenderer::class)->render(
                 notification: $notification,
                 sentByName: $sentBy->name,
+                forTransactional: true,
             ),
             'subject' => $notification->title,
         ];

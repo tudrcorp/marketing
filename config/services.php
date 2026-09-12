@@ -43,6 +43,7 @@ return [
         'email_timeout' => (int) env('MARKETING_API_EMAIL_TIMEOUT', 300),
         'birthday_test_send_path' => env('MARKETING_API_BIRTHDAY_TEST_SEND_PATH', '/api/notifications/birthday/test'),
         'bulk_emails_path' => env('MARKETING_API_BULK_EMAILS_PATH', '/api/emails/bulk'),
+        'mass_email_campaigns_path' => env('MARKETING_API_MASS_EMAIL_CAMPAIGNS_PATH', '/api/emails/campaigns'),
         'mass_send_path' => env('MARKETING_API_MASS_SEND_PATH', '/api/notifications/mass/send'),
         'mass_send_batch_path' => env('MARKETING_API_MASS_SEND_BATCH_PATH', '/api/notifications/mass/send-batch'),
         'birthday_email_batch_size' => (int) env('MARKETING_BIRTHDAY_EMAIL_BATCH_SIZE', 50),

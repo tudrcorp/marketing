@@ -229,9 +229,20 @@ test('failure inspector explains gmail no such user bounce per recipient', funct
 
 test('retry service resends only failed emails for a mass notification', function () {
     Http::fake([
-        '*/api/emails/bulk' => Http::response([
+        '*/api/emails/campaigns/*' => Http::response([
             'success' => true,
-            'message' => 'Envío realizado',
+            'campaign_id' => 'camp_retry',
+            'emails_sent' => 3,
+            'opens' => 0,
+            'clicks' => 0,
+            'bounces' => ['hard' => 0, 'soft' => 0],
+            'unsubscribed' => 0,
+            'events' => [],
+        ], 200),
+        '*/api/emails/campaigns' => Http::response([
+            'success' => true,
+            'campaign_id' => 'camp_retry',
+            'message' => 'Mailchimp aceptó la campaña.',
             'sent' => 3,
             'total' => 3,
         ], 200),
@@ -257,12 +268,14 @@ test('retry service resends only failed emails for a mass notification', functio
         ->and($result->total)->toBe(3);
 
     Http::assertSent(function ($request): bool {
-        $body = $request->body();
+        $recipients = $request['recipients'] ?? [];
 
-        return str_ends_with($request->url(), '/api/emails/bulk')
-            && str_contains($body, 'aaular@tudrencasa.com')
-            && str_contains($body, 'gcamacho@tudrencasa.com')
-            && str_contains($body, 'marketing@tudrencasa.com');
+        return str_contains($request->url(), '/api/emails/campaigns')
+            && $request->method() === 'POST'
+            && is_array($recipients)
+            && in_array('aaular@tudrencasa.com', $recipients, true)
+            && in_array('gcamacho@tudrencasa.com', $recipients, true)
+            && in_array('marketing@tudrencasa.com', $recipients, true);
     });
 
     app()->terminate();
@@ -272,9 +285,20 @@ test('retry service resends only failed emails for a mass notification', functio
 
 test('view page shows progress section and can retry failed dispatch', function () {
     Http::fake([
-        '*/api/emails/bulk' => Http::response([
+        '*/api/emails/campaigns/*' => Http::response([
             'success' => true,
-            'message' => 'Envío realizado',
+            'campaign_id' => 'camp_retry',
+            'emails_sent' => 3,
+            'opens' => 0,
+            'clicks' => 0,
+            'bounces' => ['hard' => 0, 'soft' => 0],
+            'unsubscribed' => 0,
+            'events' => [],
+        ], 200),
+        '*/api/emails/campaigns' => Http::response([
+            'success' => true,
+            'campaign_id' => 'camp_retry',
+            'message' => 'Mailchimp aceptó la campaña.',
             'sent' => 3,
             'total' => 3,
         ], 200),
@@ -306,7 +330,7 @@ test('view page shows progress section and can retry failed dispatch', function 
         ->callAction('retryDispatch')
         ->assertNotified();
 
-    Http::assertSentCount(1);
+    Http::assertSent(fn ($request): bool => $request->method() === 'POST' && str_contains($request->url(), '/api/emails/campaigns'));
 });
 
 test('analyst without manage permission cannot retry', function () {

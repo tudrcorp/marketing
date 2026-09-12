@@ -1,5 +1,6 @@
 <?php
 
+use App\Filament\Widgets\MarketingDispatchProgressFloaterWidget;
 use App\Jobs\SendMassNotificationWhatsAppBatchJob;
 use App\Marketing\BirthdayNotificationAudience;
 use App\Marketing\BirthdayNotificationChannel;
@@ -10,6 +11,7 @@ use App\Models\MassNotification;
 use App\Models\User;
 use App\Services\Marketing\DispatchProgressTracker;
 use App\Services\Marketing\MarketingApiTraceRecorder;
+use App\Services\Marketing\MassNotificationDeliverySummary;
 use App\Services\Marketing\MassNotificationDispatchService;
 use App\Services\Marketing\NotificationDispatchLogger;
 use Database\Seeders\MarketingRoleSeeder;
@@ -68,8 +70,20 @@ test('dispatch progress tracker records unit completion and marks run completed'
 
 test('dispatch service starts progress run only when more than one recipient is selected', function () {
     Http::fake([
-        '*/api/emails/bulk' => Http::response([
+        '*/api/emails/campaigns/*' => Http::response([
             'success' => true,
+            'campaign_id' => 'camp_progress',
+            'emails_sent' => 2,
+            'opens' => 0,
+            'clicks' => 0,
+            'bounces' => ['hard' => 0, 'soft' => 0],
+            'unsubscribed' => 0,
+            'events' => [],
+        ], 200),
+        '*/api/emails/campaigns' => Http::response([
+            'success' => true,
+            'campaign_id' => 'camp_progress',
+            'message' => 'Mailchimp aceptó la campaña.',
             'sent' => 2,
             'total' => 2,
         ], 200),
@@ -189,8 +203,20 @@ test('dispatch progress tracker dismiss hides run for user', function () {
 
 test('email dispatch progress records partial failures from api response', function () {
     Http::fake([
-        '*/api/emails/bulk' => Http::response([
+        '*/api/emails/campaigns/*' => Http::response([
             'success' => true,
+            'campaign_id' => 'camp_partial',
+            'emails_sent' => 1,
+            'opens' => 0,
+            'clicks' => 0,
+            'bounces' => ['hard' => 1, 'soft' => 0],
+            'unsubscribed' => 0,
+            'events' => [],
+        ], 200),
+        '*/api/emails/campaigns' => Http::response([
+            'success' => true,
+            'campaign_id' => 'camp_partial',
+            'message' => 'Mailchimp aceptó la campaña.',
             'sent' => 1,
             'total' => 2,
             'failures' => [
@@ -332,7 +358,7 @@ test('dispatch progress floater widget dismisses visible runs', function () {
 
     $this->actingAs($user);
 
-    Livewire::test(\App\Filament\Widgets\MarketingDispatchProgressFloaterWidget::class)
+    Livewire::test(MarketingDispatchProgressFloaterWidget::class)
         ->assertSet('runs', fn (array $runs): bool => count($runs) === 1)
         ->call('dismissAll')
         ->assertSet('runs', [])
@@ -407,7 +433,7 @@ test('delivery summary mirrors active run progress while email dispatch is proce
         unitKey: 'email-batch-1',
     );
 
-    $summary = app(\App\Services\Marketing\MassNotificationDeliverySummary::class)
+    $summary = app(MassNotificationDeliverySummary::class)
         ->summarize($notification, $user->id);
 
     expect($summary['has_activity'])->toBeTrue()

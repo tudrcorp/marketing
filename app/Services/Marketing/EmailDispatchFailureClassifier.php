@@ -61,6 +61,8 @@ class EmailDispatchFailureClassifier
             'socket closed',
             'unexpected socket close',
             'try again later',
+            'too many requests',
+            'rate limit',
             'no confirmó el resultado a tiempo',
             'no se pudo conectar con el api',
         ])) {

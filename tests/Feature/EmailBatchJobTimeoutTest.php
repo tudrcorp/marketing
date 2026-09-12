@@ -2,7 +2,7 @@
 
 use App\Jobs\SendBirthdayEmailBatchJob;
 use App\Jobs\SendCorporateEventInvitationEmailJob;
-use App\Jobs\SendMassNotificationEmailBatchJob;
+use App\Jobs\SendMassNotificationCampaignJob;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Tests\Concerns\SafeRefreshDatabase;
@@ -15,13 +15,11 @@ uses(SafeRefreshDatabase::class);
  * media entrega y el lote queda enviado del lado del API pero sin traza aquí.
  */
 $emailJobs = [
-    'masivas' => fn (): object => new SendMassNotificationEmailBatchJob(
+    'masivas' => fn (): object => new SendMassNotificationCampaignJob(
         massNotificationId: 1,
         emails: ['destinatario@tdg.test'],
         subject: 'Asunto',
         copy: '<p>Copy</p>',
-        batchNumber: 1,
-        totalBatches: 1,
         sentById: 1,
         source: 'mass_audience',
     ),

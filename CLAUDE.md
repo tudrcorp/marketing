@@ -114,6 +114,7 @@ MARKETING_API_TIMEOUT
 MARKETING_API_BATCH_TIMEOUT
 MARKETING_API_EMAIL_TIMEOUT
 MARKETING_API_BULK_EMAILS_PATH=/api/emails/bulk
+MARKETING_API_MASS_EMAIL_CAMPAIGNS_PATH=/api/emails/campaigns
 MARKETING_API_MASS_SEND_BATCH_PATH=/api/notifications/mass/send-batch
 MARKETING_API_BIRTHDAY_TEST_SEND_PATH=/api/notifications/birthday/test
 MARKETING_API_MASS_SEND_PATH=/api/notifications/mass/send   # configurado en config/services.php pero NO se usa en ningún servicio/job de la app
@@ -154,11 +155,12 @@ Clase base abstracta: `MarketingPaginatedApiService` (`paginate()`/`find()`, fal
 
 Nota RRHH: `MarketingRrhhColaboradoresApiService` es el único servicio que **no** hereda el `paginate()` genérico de la clase base — el API expone un tamaño de página fijo (10) e ignora `limit`/`search`, así que el servicio agrega (`once()`) todas las páginas localmente y luego pagina/filtra/ordena en memoria para que Filament pueda buscar y cambiar el tamaño de página con normalidad.
 
-### Envío de emails masivos
+### Envío de emails
 
-- `POST {bulk_emails_path}` (config `bulk_emails_path`, por defecto `/api/emails/bulk`).
-- Body real (`BirthdayNotificationBulkEmailService::sendBatch()` / `BirthdayNotificationTestSendService::sendEmail()` / `SendMassNotificationEmailBatchJob::handle()`): `recipients` (string — `json_encode()` de un array de emails), `copy` (HTML renderizado), `subject`, y opcionalmente `dry_run => 'true'`.
-- Usado por **tres** flujos distintos, cada uno con su propio par renderer/adjuntos en `app/Mail/`: notificaciones de cumpleaños (envío real y de prueba, `BirthdayNotificationEmailRenderer` + `BirthdayNotificationEmailAttachments::attach()`), canal email de notificaciones masivas (`SendMassNotificationEmailBatchJob`, `MassNotificationEmailRenderer` + `MassNotificationEmailAttachments::attach()`) e invitaciones de eventos corporativos (`CorporateEventRegistrationShareService`, `CorporateEventInvitationEmailRenderer` + `CorporateEventInvitationEmailAttachments::attach()`). Los tres comparten el mismo patrón de payload y el mismo endpoint, pero no comparten clase.
+- `POST {bulk_emails_path}` (config `bulk_emails_path`, por defecto `/api/emails/bulk`) — **cumpleaños, invitaciones de eventos y envíos de prueba**. En `integracorp-api` entrega Mailchimp Transactional (Mandrill) si `EMAIL_PROVIDER=mailchimp`, o SMTP/Gmail si `EMAIL_PROVIDER=smtp`.
+- Body real (`BirthdayNotificationBulkEmailService::sendBatch()` / `BirthdayNotificationTestSendService::sendEmail()` / `MassNotificationTestSendService` / `SendCorporateEventInvitationEmailJob`): `recipients` (string — `json_encode()` de un array de emails), `copy` (HTML renderizado), `subject`, y opcionalmente `dry_run => 'true'`.
+- `POST {mass_email_campaigns_path}` (default `/api/emails/campaigns`) — **notificaciones masivas**. Un único POST JSON con todos los destinatarios + HTML (URLs públicas, `*|UNSUB|*`, `*|LIST:ADDRESS|*`). El API sincroniza la Audience de Mailchimp, crea un segmento estático y envía una campaña. Respuesta: `campaign_id`, `synced`, `sent`. No uses lotes de 15 ni el circuit breaker de Gmail en este camino.
+- Usado por **tres** flujos distintos para `/bulk`, cada uno con su propio par renderer/adjuntos en `app/Mail/`: notificaciones de cumpleaños (`BirthdayNotificationEmailRenderer` + `BirthdayNotificationEmailAttachments::attach()`), pruebas de masivas (`MassNotificationTestSendService`) e invitaciones de eventos (`CorporateEventInvitationEmailRenderer` + `CorporateEventInvitationEmailAttachments::attach()`). Las masivas reales usan `MassNotificationEmailRenderer` + `SendMassNotificationCampaignJob`.
 
 ### WhatsApp / pruebas
 
@@ -172,7 +174,9 @@ Nota RRHH: `MarketingRrhhColaboradoresApiService` es el único servicio que **no
 - `ProcessBirthdayNotificationJob` → recolecta destinatarios y encola lotes de `SendBirthdayEmailBatchJob`. **Ojo: hoy nada en la app lo despacha** — no hay scheduler (`routes/console.php` solo tiene `inspire`) ni acción en el panel que dispare el envío real de cumpleaños; el recurso Filament solo ofrece *envío de prueba* (`SendTestBirthdayNotificationAction`) y el comando `birthday:simulate-dispatch` corre con `dry_run`. Solo los tests instancian el job. Si el usuario pide "que los cumpleaños salgan solos", eso implica añadir el disparador (scheduler o acción), no arreglar el job.
 - `SendBirthdayEmailBatchJob` → hace el `POST` de correos masivos de cumpleaños.
 - `ProcessMassNotificationChannelsJob` → orquesta los canales de una notificación masiva.
-- `SendMassNotificationEmailBatchJob` → hace el `POST` a `bulk_emails_path` para el canal email de una notificación masiva. Ante cuota agotada, bloqueo de autenticación o corte de red reprograma una copia con los destinatarios pendientes en vez de darlos por perdidos (ver sección 11).
+- `SendMassNotificationCampaignJob` → hace el `POST` a `mass_email_campaigns_path` (Mailchimp Marketing). Ante `429` reprograma la campaña sin circuit breaker de Gmail. Si Mailchimp ya devolvió `campaign_id`, no reintentes el send.
+- `SyncMailchimpCampaignReportJob` → consulta `GET /api/emails/campaigns/{id}` (reporte Marketing **más** eventos del webhook: rebotes, aperturas, bajas) y actualiza el `NotificationDispatchLog`.
+- `SendMassNotificationEmailBatchJob` → legado SMTP por lotes; las masivas ya no lo despachan.
 - `SendMassNotificationWhatsAppBatchJob` → hace el `POST` a `send-batch`.
 - `SendCorporateEventInvitationEmailJob` → envía la invitación de un evento corporativo por el mismo endpoint bulk (cola `email`).
 - `PromoteCorporateEventJob` → promoción de eventos corporativos.
@@ -180,7 +184,7 @@ Nota RRHH: `MarketingRrhhColaboradoresApiService` es el único servicio que **no
 
 ### Trazas de las llamadas al API (`MarketingApiTraceRecorder`)
 
-Todo servicio o job que llame al Marketing API construye su traza con `MarketingApiTraceRecorder` (`fromResponse()` / `fromConnectionError()`), que devuelve un array `{ api_calls: [...] }` con endpoint, método, request, status y cuerpo de respuesta. Esa traza se guarda en el `NotificationDispatchLog` y es lo que alimenta los mensajes de remediación de `NotificationDispatchFailureResolver` y el reintento de `NotificationDispatchRetryService`. **Al añadir una llamada nueva al API desde un job/servicio, registra su traza con este recorder** en lugar de inventar un formato propio — si no, el historial de envíos queda sin diagnóstico. Lo usan hoy: `BirthdayNotificationBulkEmailService`, `BirthdayNotificationTestSendService`, `MassNotificationDispatchService`, `MassNotificationTestSendService`, `CorporateEventRegistrationShareService`, `SendMassNotificationEmailBatchJob`, `SendMassNotificationWhatsAppBatchJob` y `SendCorporateEventInvitationEmailJob`.
+Todo servicio o job que llame al Marketing API construye su traza con `MarketingApiTraceRecorder` (`fromResponse()` / `fromConnectionError()`), que devuelve un array `{ api_calls: [...] }` con endpoint, método, request, status y cuerpo de respuesta. Esa traza se guarda en el `NotificationDispatchLog` y es lo que alimenta los mensajes de remediación de `NotificationDispatchFailureResolver` y el reintento de `NotificationDispatchRetryService`. **Al añadir una llamada nueva al API desde un job/servicio, registra su traza con este recorder** en lugar de inventar un formato propio — si no, el historial de envíos queda sin diagnóstico. Lo usan hoy: `BirthdayNotificationBulkEmailService`, `BirthdayNotificationTestSendService`, `MassNotificationDispatchService`, `MassNotificationTestSendService`, `CorporateEventRegistrationShareService`, `SendMassNotificationCampaignJob`, `SyncMailchimpCampaignReportJob`, `SendMassNotificationWhatsAppBatchJob` y `SendCorporateEventInvitationEmailJob`.
 
 Comando útil: `php artisan birthday:simulate-dispatch {notification} {--date=}` — simula el envío masivo contra el API con `dry_run=true`, **sin enviar correos reales**.
 
@@ -250,7 +254,7 @@ Patrón común (ver `App\Models\TravelAgency` como referencia): `$incrementing =
 
 Ver el detalle completo de payloads en la sección 7 ("Jobs relacionados con el API"). Resumen de colas: `QUEUE_CONNECTION=database` en local (`sync` en tests).
 
-**Dos colas, no una.** Los jobs de correo (`SendBirthdayEmailBatchJob`, `SendMassNotificationEmailBatchJob`, `SendCorporateEventInvitationEmailJob`) se auto-asignan a la cola `email` con `$this->onQueue('email')` en su constructor; el resto va a `default`. Por eso `composer run dev` levanta `php artisan queue:listen --queue=default,email`. Si añades un job de correo nuevo, respeta esa convención; si levantas el worker a mano, **incluye ambas colas** o los correos se quedarán encolados sin procesar.
+**Dos colas, no una.** Los jobs de correo (`SendBirthdayEmailBatchJob`, `SendMassNotificationCampaignJob`, `SyncMailchimpCampaignReportJob`, `SendCorporateEventInvitationEmailJob`) se auto-asignan a la cola `email` con `$this->onQueue('email')` en su constructor; el resto va a `default`. Por eso `composer run dev` levanta `php artisan queue:listen --queue=default,email`. Si añades un job de correo nuevo, respeta esa convención; si levantas el worker a mano, **incluye ambas colas** o los correos se quedarán encolados sin procesar.
 
 ### Diagnóstico: "el envío masivo no envió nada"
 
@@ -374,7 +378,10 @@ Las rutas listadas en la sección 7 coinciden 1:1 con lo que expone `integracorp
 |---|---|---|---|
 | Widgets de salud | `/api/health`, `/api/health/db` | público | sin API Key |
 | Audiencias (9 recursos, ver sección 7) | `/api/agencies`, `/api/agents`, `/api/travel-agencies`, `/api/travel-agents`, `/api/affiliates`, `/api/affiliate-corporates`, `/api/suppliers`, `/api/doctor-nurses`, `/api/rrhh-colaboradores` | API Key | ver nota de paginación abajo |
-| Correo masivo | `POST /api/emails/bulk` | API Key | `multipart/form-data` del lado API; ver nota de adjuntos |
+| Correo transaccional (cumpleaños, eventos, pruebas) | `POST /api/emails/bulk` | API Key | Mailchimp Transactional o SMTP |
+| Campañas masivas | `POST /api/emails/campaigns` | API Key | Mailchimp Marketing |
+| Reporte de campaña | `GET /api/emails/campaigns/{id}` | API Key | opens/bounces/unsub |
+| Webhook Mailchimp | `POST /api/emails/mailchimp/webhook` | secreto query | público |
 | WhatsApp por lotes | `POST /api/notifications/mass/send-batch` | API Key | máx. 50 destinatarios, responde `200`/`202`, delay anti-ban |
 | WhatsApp/SMS de prueba | `POST /api/notifications/birthday/test` | API Key | el canal `sms` responde `501` (no implementado del lado API) aunque `BirthdayNotificationChannel::Sms` ya existe en Laravel |
 

@@ -71,9 +71,20 @@ test('multi recipient dispatch queues channel processing and starts progress imm
 
 test('queued channel job sends emails and completes progress run', function () {
     Http::fake([
-        '*/api/emails/bulk' => Http::response([
+        '*/api/emails/campaigns/*' => Http::response([
             'success' => true,
-            'message' => 'Envío realizado',
+            'campaign_id' => 'camp_queued',
+            'emails_sent' => 2,
+            'opens' => 0,
+            'clicks' => 0,
+            'bounces' => ['hard' => 0, 'soft' => 0],
+            'unsubscribed' => 0,
+            'events' => [],
+        ], 200),
+        '*/api/emails/campaigns' => Http::response([
+            'success' => true,
+            'campaign_id' => 'camp_queued',
+            'message' => 'Mailchimp aceptó la campaña.',
             'sent' => 2,
             'total' => 2,
         ], 200),
@@ -104,5 +115,5 @@ test('queued channel job sends emails and completes progress run', function () {
         ->and($runs[0]['percent'])->toBe(100)
         ->and($runs[0]['sent_recipients'])->toBe(2);
 
-    Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/api/emails/bulk'));
+    Http::assertSent(fn ($request): bool => $request->method() === 'POST' && str_contains($request->url(), '/api/emails/campaigns'));
 });

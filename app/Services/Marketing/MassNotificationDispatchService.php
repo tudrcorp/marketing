@@ -3,9 +3,9 @@
 namespace App\Services\Marketing;
 
 use App\Jobs\ProcessMassNotificationChannelsJob;
-use App\Jobs\SendMassNotificationEmailBatchJob;
+use App\Jobs\SendMassNotificationCampaignJob;
 use App\Jobs\SendMassNotificationWhatsAppBatchJob;
-use App\Mail\MassNotificationEmailAttachments;
+use App\Jobs\SyncMailchimpCampaignReportJob;
 use App\Mail\MassNotificationEmailRenderer;
 use App\Marketing\BirthdayNotificationAudience;
 use App\Marketing\BirthdayNotificationChannel;
@@ -460,44 +460,103 @@ class MassNotificationDispatchService
             );
         }
 
-        // Con un run de progreso activo (más de un destinatario), se envía en lotes
-        // pequeños por job en cola en vez de una sola llamada gigante: una audiencia
-        // grande en una sola petición puede tardar más que el timeout HTTP (el propio
-        // API externo también aborta requests largas del lado del servidor).
+        $copy = app(MassNotificationEmailRenderer::class)->render(
+            notification: $notification,
+            sentByName: $sentBy->name,
+        );
+
         if ($dispatchRunId !== null) {
-            return $this->dispatchEmailInBatches($notification, $emails, $sentBy, $source, $dispatchRunId);
+            return $this->queueEmailCampaign($notification, $emails, $copy, $sentBy, $source, $dispatchRunId);
         }
 
-        $endpoint = $this->bulkEmailsEndpoint();
+        return $this->sendEmailCampaign($notification, $emails, $copy, $sentBy, $source);
+    }
+
+    /**
+     * @param  list<string>  $emails
+     */
+    private function queueEmailCampaign(
+        MassNotification $notification,
+        array $emails,
+        string $copy,
+        User $sentBy,
+        NotificationDispatchSource $source,
+        string $dispatchRunId,
+    ): MassNotificationChannelResult {
+        $recipientCount = count($emails);
+
+        $this->progressTracker->registerChannelUnits(
+            runId: $dispatchRunId,
+            channelLabel: BirthdayNotificationChannel::Email->getLabel(),
+            units: 1,
+            detail: "Sincronizando {$recipientCount} contacto".($recipientCount === 1 ? '' : 's').' en Mailchimp…',
+        );
+
+        SendMassNotificationCampaignJob::dispatch(
+            massNotificationId: $notification->getKey(),
+            emails: $emails,
+            subject: $notification->title,
+            copy: $copy,
+            sentById: $sentBy->getKey(),
+            source: $source->value,
+            dispatchRunId: $dispatchRunId,
+        );
+
+        return new MassNotificationChannelResult(
+            channel: BirthdayNotificationChannel::Email,
+            successful: true,
+            sent: 0,
+            total: $recipientCount,
+            message: "Se encoló 1 campaña de Mailchimp para {$recipientCount} destinatario".($recipientCount === 1 ? '' : 's').'.',
+            apiTrace: [
+                'api_calls' => [],
+                'notes' => 'El envío de correo se procesará como una campaña de Mailchimp. La respuesta del API se registrará en el historial.',
+            ],
+        );
+    }
+
+    /**
+     * @param  list<string>  $emails
+     */
+    private function sendEmailCampaign(
+        MassNotification $notification,
+        array $emails,
+        string $copy,
+        User $sentBy,
+        NotificationDispatchSource $source,
+    ): MassNotificationChannelResult {
+        $endpoint = $this->campaignsEndpoint();
         $payload = [
-            'recipients' => json_encode($emails),
-            'copy' => app(MassNotificationEmailRenderer::class)->render(
-                notification: $notification,
-                sentByName: $sentBy->name,
-            ),
+            'recipients' => array_values($emails),
+            'copy' => $copy,
             'subject' => $notification->title,
+            'title' => $notification->title,
         ];
 
         try {
-            $response = MassNotificationEmailAttachments::attach(
-                app(MarketingApiHttpFactory::class)->emailClient(),
-                $notification,
-            )->post($endpoint, $payload);
+            $response = app(MarketingApiHttpFactory::class)
+                ->emailClient()
+                ->asJson()
+                ->post($endpoint, $payload);
 
             $apiTrace = $this->apiTraceRecorder->fromResponse(
-                label: 'Correo masivo (notificación)',
+                label: 'Campaña Mailchimp (notificación)',
                 endpoint: $endpoint,
                 method: 'POST',
                 request: $payload,
                 response: $response,
             );
 
-            /** @var array{sent?: int, total?: int, failed?: int, success?: bool, message?: string, reason?: string, error?: string, failures?: list<array<string, mixed>>}|null $responsePayload */
+            if (filled($response->json('campaign_id'))) {
+                $apiTrace['mailchimp_campaign_id'] = (string) $response->json('campaign_id');
+            }
+
+            /** @var array{sent?: int, total?: int, failed?: int, success?: bool, campaign_id?: string, message?: string, reason?: string, error?: string, failures?: list<array<string, mixed>>}|null $responsePayload */
             $responsePayload = $response->json();
-            $payload = is_array($responsePayload) ? $responsePayload : [];
-            $sent = (int) ($payload['sent'] ?? ($response->successful() ? count($emails) : 0));
-            $total = (int) ($payload['total'] ?? count($emails));
-            $payloadSuccess = ($payload['success'] ?? null) !== false;
+            $body = is_array($responsePayload) ? $responsePayload : [];
+            $sent = (int) ($body['sent'] ?? ($response->successful() ? count($emails) : 0));
+            $total = (int) ($body['total'] ?? count($emails));
+            $payloadSuccess = ($body['success'] ?? null) !== false;
             $channelSuccessful = $response->successful() && $payloadSuccess && $sent >= $total;
 
             if (! $response->successful() || ! $payloadSuccess) {
@@ -506,13 +565,22 @@ class MassNotificationDispatchService
                     successful: $channelSuccessful || ($response->successful() && $sent > 0),
                     sent: $sent,
                     total: $total,
-                    message: $this->resolveApiErrorMessage($payload, $response->body()),
+                    message: $this->resolveApiErrorMessage($body, $response->body()),
                     apiTrace: $apiTrace,
                 );
             }
 
+            $campaignId = filled($body['campaign_id'] ?? null) ? (string) $body['campaign_id'] : null;
+
+            if ($campaignId !== null) {
+                SyncMailchimpCampaignReportJob::dispatch(
+                    massNotificationId: $notification->getKey(),
+                    campaignId: $campaignId,
+                )->delay(now()->addMinutes(5));
+            }
+
             $failedFromPayload = max(0, $total - $sent);
-            $message = (string) ($payload['message'] ?? 'Correos enviados correctamente.');
+            $message = (string) ($body['message'] ?? 'Mailchimp aceptó la campaña.');
 
             if ($failedFromPayload > 0) {
                 $message = "Envío parcial: {$sent} de {$total} correos entregados. {$failedFromPayload} fallido"
@@ -534,10 +602,10 @@ class MassNotificationDispatchService
                 sent: 0,
                 total: count($emails),
                 message: $this->apiTraceRecorder->isTimeout($exception)
-                    ? 'El API de correos no confirmó el resultado a tiempo. Es probable que los correos sí se hayan enviado.'
+                    ? 'El API de correos no confirmó el resultado a tiempo. Es probable que la campaña sí se haya enviado.'
                     : 'No se pudo conectar con el API de correos.',
                 apiTrace: $this->apiTraceRecorder->fromConnectionError(
-                    label: 'Correo masivo (notificación)',
+                    label: 'Campaña Mailchimp (notificación)',
                     endpoint: $endpoint,
                     method: 'POST',
                     request: $payload,
@@ -545,72 +613,6 @@ class MassNotificationDispatchService
                 ),
             );
         }
-    }
-
-    /**
-     * @param  list<string>  $emails
-     */
-    private function dispatchEmailInBatches(
-        MassNotification $notification,
-        array $emails,
-        User $sentBy,
-        NotificationDispatchSource $source,
-        string $dispatchRunId,
-    ): MassNotificationChannelResult {
-        $batchSize = MassEmailDispatchPace::batchSize();
-        $batches = array_chunk($emails, $batchSize);
-        $totalBatches = count($batches);
-        $copy = app(MassNotificationEmailRenderer::class)->render(
-            notification: $notification,
-            sentByName: $sentBy->name,
-        );
-
-        $this->progressTracker->registerChannelUnits(
-            runId: $dispatchRunId,
-            channelLabel: BirthdayNotificationChannel::Email->getLabel(),
-            units: $totalBatches,
-            detail: "Encolando {$totalBatches} lote(s) de correo…",
-        );
-
-        // Los lotes se escalonan en vez de salir todos de golpe: una ráfaga contra el
-        // proveedor SMTP dispara sus límites de conexión y de cuota (ver el 550 5.4.5 /
-        // 454 que tumbó una campaña completa). Es el equivalente de la pausa que ya
-        // aplica WhatsApp entre lotes.
-        $pauseSeconds = MassEmailDispatchPace::pauseSeconds();
-
-        foreach ($batches as $index => $batchEmails) {
-            $pendingBatch = SendMassNotificationEmailBatchJob::dispatch(
-                massNotificationId: $notification->getKey(),
-                emails: $batchEmails,
-                subject: $notification->title,
-                copy: $copy,
-                batchNumber: $index + 1,
-                totalBatches: $totalBatches,
-                sentById: $sentBy->getKey(),
-                source: $source->value,
-                dispatchRunId: $dispatchRunId,
-            );
-
-            if ($pauseSeconds > 0 && $index > 0) {
-                $pendingBatch->delay(now()->addSeconds($index * $pauseSeconds));
-            }
-        }
-
-        $recipientCount = count($emails);
-
-        return new MassNotificationChannelResult(
-            channel: BirthdayNotificationChannel::Email,
-            successful: true,
-            sent: 0,
-            total: $recipientCount,
-            message: "Se encolaron {$totalBatches} lote(s) de correo para {$recipientCount} destinatario".($recipientCount === 1 ? '' : 's').'.',
-            apiTrace: [
-                'api_calls' => [],
-                'notes' => 'El envío de correo se procesará por lotes en segundo plano. La respuesta del API se registrará en cada lote.',
-                'queued_batches' => $totalBatches,
-                'batch_size' => $batchSize,
-            ],
-        );
     }
 
     /**
@@ -803,11 +805,11 @@ class MassNotificationDispatchService
         return MassNotificationContentType::tryFromMixed($contentType)?->value;
     }
 
-    private function bulkEmailsEndpoint(): string
+    private function campaignsEndpoint(): string
     {
-        $path = config('services.marketing_api.bulk_emails_path', '/api/emails/bulk');
+        $path = config('services.marketing_api.mass_email_campaigns_path', '/api/emails/campaigns');
 
-        return rtrim(config('services.marketing_api.base_url'), '/').$path;
+        return rtrim((string) config('services.marketing_api.base_url'), '/').$path;
     }
 
     /**

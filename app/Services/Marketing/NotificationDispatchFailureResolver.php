@@ -42,10 +42,16 @@ class NotificationDispatchFailureResolver
 
         if ($status === NotificationDispatchStatus::Sent) {
             if ($channel === BirthdayNotificationChannel::Email) {
+                $mentionsMailchimp = str_contains(mb_strtolower($technicalMessage ?? ''), 'mailchimp');
+
                 return [
-                    'failure_code' => 'smtp_accepted',
-                    'analyst_message' => 'El servidor de correo aceptó el mensaje. Eso no garantiza que llegó al buzón final.',
-                    'resolution_steps' => "1. Si el destinatario no lo recibió, revisa la bandeja de {$this->senderMailbox()} por un rebote (Mail Delivery Subsystem).\n2. Un 550 5.1.1 significa que el correo no existe: corrige el destinatario y vuelve a enviar.\n3. No reintentes el mismo correo inválido; Gmail lo seguirá rechazando.",
+                    'failure_code' => $mentionsMailchimp ? 'mailchimp_accepted' : 'smtp_accepted',
+                    'analyst_message' => $mentionsMailchimp
+                        ? 'Mailchimp aceptó la campaña. Eso no garantiza que cada buzón la haya recibido; el reporte de aperturas y rebotes llega unos minutos después.'
+                        : 'El servidor de correo aceptó el mensaje. Eso no garantiza que llegó al buzón final.',
+                    'resolution_steps' => $mentionsMailchimp
+                        ? "1. Espera el refresco del reporte (aperturas, rebotes y bajas) en este historial.\n2. Si un destinatario no lo recibió, revisa si aparece como rebote o baja en el detalle técnico.\n3. No relances la campaña: Mailchimp ya tiene el envío y un reenvío duplicaría correos."
+                        : "1. Si el destinatario no lo recibió, revisa la bandeja de {$this->senderMailbox()} por un rebote (Mail Delivery Subsystem).\n2. Un 550 5.1.1 significa que el correo no existe: corrige el destinatario y vuelve a enviar.\n3. No reintentes el mismo correo inválido; Gmail lo seguirá rechazando.",
                 ];
             }
 
@@ -206,6 +212,18 @@ class NotificationDispatchFailureResolver
                 'whatsapp_queue_failed',
                 'El API aceptó el lote, pero Ultramsg no pudo entregar uno o más mensajes.',
                 "1. Revisa la consola de integracorp-api (busca [whatsapp-queue] Error al enviar mensaje).\n2. Si enviaste imagen, confirma que el adjunto exista y que el caption no supere 1024 caracteres.\n3. Verifica que el número tenga WhatsApp activo y esté en formato 58412…\n4. Consulta GET /api/notifications/whatsapp/status en el API.",
+            ),
+            str_contains($message, 'checklist de mailchimp'),
+            str_contains($message, '*|unsub|*') => $this->guidance(
+                'mailchimp_checklist_failed',
+                'Mailchimp rechazó la campaña porque el HTML no supera el checklist de envío (baja, dominio o dirección física).',
+                "1. Confirma que la plantilla incluya el enlace de baja (*|UNSUB|*) y la dirección física (*|LIST:ADDRESS|*).\n2. Verifica en Mailchimp que el dominio de envío esté verificado.\n3. Reintenta el envío después de corregir el contenido; no relances si la campaña ya se creó (mira campaign_id en el detalle técnico).",
+            ),
+            str_contains($message, 'too many requests'),
+            str_contains($message, 'rate limit') => $this->guidance(
+                'mailchimp_rate_limited',
+                'Mailchimp rechazó el envío por exceso de peticiones. El job se reprograma solo.',
+                "1. No relances la campaña: el reintento automático evita duplicar contactos y campañas.\n2. Si se agotan los reintentos, espera unos minutos y revisa GET /api/emails/mailchimp/status en el API.\n3. Campañas muy grandes pueden pedir varios lotes de sincronización; reintenta más tarde.",
             ),
             str_contains($message, 'el api rechazó') => $this->guidance(
                 'api_rejected',

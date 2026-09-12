@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\SendMassNotificationCampaignJob;
 use App\Jobs\SendMassNotificationEmailBatchJob;
 use App\Marketing\BirthdayNotificationAudience;
 use App\Marketing\BirthdayNotificationChannel;
@@ -225,11 +226,8 @@ test('the progress floater keeps the batch open while it waits, without counting
         ->and($run['detail'])->toContain('reencolado');
 });
 
-test('email batches are staggered instead of being queued all at once', function () {
+test('email campaigns are queued as a single Mailchimp job instead of staggered SMTP batches', function () {
     Queue::fake();
-    config()->set('services.marketing_api.mass_email_batch_size', 1);
-    config()->set('services.marketing_api.mass_email_batch_pause_seconds', 5);
-
     $notification = resilienceNotification();
     $user = User::query()->find($notification->created_by_id);
     $runId = app(DispatchProgressTracker::class)->start($user->id, $notification->getKey(), $notification->title, 3);
@@ -246,10 +244,6 @@ test('email batches are staggered instead of being queued all at once', function
         dispatchRunId: $runId,
     );
 
-    Queue::assertPushed(SendMassNotificationEmailBatchJob::class, 3);
-
-    // El primero sale de inmediato; los siguientes esperan su turno.
-    Queue::assertPushed(SendMassNotificationEmailBatchJob::class, fn ($job) => $job->batchNumber === 1 && $job->delay === null);
-    Queue::assertPushed(SendMassNotificationEmailBatchJob::class, fn ($job) => $job->batchNumber === 2 && $job->delay !== null);
-    Queue::assertPushed(SendMassNotificationEmailBatchJob::class, fn ($job) => $job->batchNumber === 3 && $job->delay !== null);
+    Queue::assertPushed(SendMassNotificationCampaignJob::class, 1);
+    Queue::assertPushed(SendMassNotificationCampaignJob::class, fn ($job) => count($job->emails) === 3);
 });

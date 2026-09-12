@@ -65,14 +65,15 @@ class DispatchProgressTracker
         int $batchNumber,
         int $totalBatches,
         int $recipientCount,
+        ?string $detail = null,
     ): void {
-        $this->mutate($runId, function (array $run) use ($channelLabel, $batchNumber, $totalBatches, $recipientCount): array {
+        $this->mutate($runId, function (array $run) use ($channelLabel, $batchNumber, $totalBatches, $recipientCount, $detail): array {
             if ((int) ($run['total_units'] ?? 0) === 0) {
                 $run['total_units'] = $totalBatches;
             }
 
             $run['current_channel'] = $channelLabel;
-            $run['detail'] = "{$channelLabel} · Procesando lote {$batchNumber}/{$totalBatches} ({$recipientCount} destinatario".($recipientCount === 1 ? '' : 's').')…';
+            $run['detail'] = $detail ?? "{$channelLabel} · Procesando lote {$batchNumber}/{$totalBatches} ({$recipientCount} destinatario".($recipientCount === 1 ? '' : 's').')…';
             $run['percent'] = max($this->calculatePercent($run), 5);
 
             return $run;
