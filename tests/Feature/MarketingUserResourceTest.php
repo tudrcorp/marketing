@@ -31,6 +31,39 @@ function panelUserWithPermissions(array $permissions): User
     ]);
 }
 
+test('panel passwords only need four characters', function () {
+    $admin = panelUserWithPermissions(MarketingPermission::all());
+    $analystRole = MarketingRole::query()->where('slug', 'analista')->firstOrFail();
+
+    $this->actingAs($admin);
+
+    Livewire::test(CreateUser::class)
+        ->fillForm([
+            'name' => 'Luis Ruiz',
+            'email' => 'luis.ruiz@tudrencasa.com',
+            'marketing_role_id' => $analystRole->id,
+            'password' => 'tdg4',
+            'password_confirmation' => 'tdg4',
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(Hash::check('tdg4', User::query()->where('email', 'luis.ruiz@tudrencasa.com')->value('password')))
+        ->toBeTrue();
+
+    // Por debajo de cuatro sigue rechazándose.
+    Livewire::test(CreateUser::class)
+        ->fillForm([
+            'name' => 'Eva Soto',
+            'email' => 'eva.soto@tudrencasa.com',
+            'marketing_role_id' => $analystRole->id,
+            'password' => 'tdg',
+            'password_confirmation' => 'tdg',
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['password']);
+});
+
 test('administrator can register a panel user with a marketing role', function () {
     $admin = panelUserWithPermissions(MarketingPermission::all());
     $analystRole = MarketingRole::query()->where('slug', 'analista')->firstOrFail();

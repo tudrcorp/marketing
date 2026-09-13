@@ -65,7 +65,7 @@ class UserForm
                             ->autocomplete('new-password')
                             ->helperText(fn (string $operation): string => $operation === 'edit'
                                 ? 'Déjala en blanco para conservar la contraseña actual.'
-                                : 'El usuario la usará en el acceso al panel.'),
+                                : 'El usuario la usará en el acceso al panel. Mínimo 4 caracteres.'),
                         TextInput::make('password_confirmation')
                             ->label('Confirmar contraseña')
                             ->password()

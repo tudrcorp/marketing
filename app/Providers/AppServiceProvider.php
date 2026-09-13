@@ -62,14 +62,8 @@ class AppServiceProvider extends ServiceProvider
             app()->isProduction(),
         );
 
-        Password::defaults(fn (): ?Password => app()->isProduction()
-            ? Password::min(12)
-                ->mixedCase()
-                ->letters()
-                ->numbers()
-                ->symbols()
-                ->uncompromised()
-            : null,
-        );
+        // Mínimo de 4 caracteres en todos los entornos: los usuarios del panel son
+        // internos y el administrador de marketing les reparte la contraseña a mano.
+        Password::defaults(fn (): Password => Password::min(4));
     }
 }

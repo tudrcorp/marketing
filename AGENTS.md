@@ -315,6 +315,7 @@ Comando de simulación: `php artisan birthday:simulate-dispatch {notification} {
 13. Tras editar PHP: `vendor/bin/pint --dirty --format agent`.
 14. No cambies dependencias del proyecto sin aprobación explícita.
 15. No crees archivos de documentación Markdown salvo que el usuario lo pida explícitamente (esta actualización de `CLAUDE.md` sí fue solicitada).
+16. **Contraseñas del panel: mínimo 4 caracteres, sin requisitos de composición.** `Password::defaults()` (en `AppServiceProvider::configureDefaults()`) devuelve `Password::min(4)` en **todos** los entornos — decisión explícita del usuario el 13/09/2026, porque los usuarios del panel son internos y el administrador de marketing reparte las claves a mano. No subas el mínimo ni le devuelvas `mixedCase()`/`numbers()`/`symbols()`/`uncompromised()` sin que lo pida. De ahí cuelgan el formulario de usuarios de Filament (`UserForm`) y `App\Concerns\PasswordValidationRules` (Fortify).
 
 ## 13. Variables de entorno críticas
 
