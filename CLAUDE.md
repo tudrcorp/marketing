@@ -53,6 +53,7 @@ Reglas de arquitectura a respetar:
 - Cola: `QUEUE_CONNECTION=database` (en local, con `php artisan queue:listen` vía `composer run dev`). Hay **dos colas**: `default` y `email` (ver sección 11).
 - Base de datos por defecto (`.env.example`): SQLite (`DB_CONNECTION=sqlite`). En tests, siempre SQLite `:memory:` (ver sección 14).
 - UI del panel: español, marca TDG (naranja/azul, tipografía IBM Plex Sans/Mono), Filament en modo SPA.
+- Idioma de la app: `APP_LOCALE=es` (el default de `config/app.php` también es `es`, para que CI y cualquier entorno sin `.env` queden en español). Las traducciones propias viven en `lang/es.json` (cadenas `__()` de las vistas Blade/Flux) y en `lang/es/{validation,auth,passwords,pagination}.php` (mensajes de Laravel); Filament y Flux ya traen su `es` en `vendor`. `lang/en/` se conserva solo como fallback (`APP_FALLBACK_LOCALE=en`). **Si agregas una cadena `__('…')` nueva, añade su traducción a `lang/es.json`.**
 
 ## 5. Mapa de directorios importantes
 
@@ -89,10 +90,11 @@ Reglas de arquitectura a respetar:
 3. **Eventos corporativos** (`CorporateEvent` / `CorporateEventRegistration`) — CRUD, publicación, promoción, inscripciones públicas por token, compartir enlace.
 4. **Editorial / redes** (`SocialAccount`, `EditorialPublication`) — cuentas sociales oficiales TDG, calendario editorial, flujo de aprobación (`PublicationStatus`: `Draft` → `PendingApproval` → `Scheduled` → `Published`, con `Failed`/`Cancelled`).
 5. **Audiencias TDG** — lectura (**sin persistencia local**) de agentes/agencias de corretaje, agentes/agencias de viajes, afiliados, proveedores y colaboradores RRHH, desde el Marketing API.
-6. **Grupos de clientes** (`ClientGroup` / `Client`) — única audiencia con persistencia **local** en BD, con responsable (`responsible_name/email/phone`) y contactos.
-7. **Historial de envíos** (`NotificationDispatchLog`) — auditoría de entregas/fallas con mensajes de remediación para analistas y opción de reintento.
-8. **Roles y permisos** — RBAC propio (`MarketingRole` + `MarketingPermission`), sin Spatie ni paquete de terceros.
-9. **Dashboard** — `ApiHealthWidget`, `DatabaseHealthWidget` y `MarketingDashboardHealthIndicatorsWidget` (los tres vía el trait `InteractsWithMarketingHealthCheck` sobre `MarketingApiHealthService`) más `MarketingActivityHeatmapWidget`, alimentado por `MarketingDashboardHeatmapService`, que cruza `CorporateEvent` + `EditorialPublication` **locales** por día (no consulta el API externo).
+6. **Grupos de clientes** (`ClientGroup` / `Client`) — audiencia con persistencia **local** en BD, con responsable (`responsible_name/email/phone`) y contactos.
+7. **Externos** (`ExternalCompany`) — audiencia con persistencia **local** en BD para quienes no están en Integracorp. Cada externo tiene un `type` (`App\Marketing\ExternalCompanyType`: `Company` o `NaturalPerson`) que decide qué exige el formulario: la **empresa** pide razón social y los cuatro datos del responsable; la **persona natural** solo nombre y apellido, CI, teléfono y correo (sin razón social, con responsable opcional). El resto de columnas es idéntico para ambos, y `legal_name` más los `responsible_*` son nullable en BD. CRUD en Filament (`/marketing/externos`, con badge y filtro por tipo); envíos masivos vía `ExternalCompanyContactCollector` (si no hay responsable, no se anexa contacto de respuesta). La lista ofrece además **importación CSV/XLSX** (`ImportExternalCompaniesAction` + `ExternalCompanyImporter`): procesa en el acto (sin colas), empareja por RIF/CI para actualizar el externo existente y reporta las filas rechazadas en la notificación; la plantilla se descarga desde el propio modal. Columnas obligatorias: Compañía/Nombre y apellido, RIF / CI, Teléfono y Correo (`REQUIRED_FIELDS`); la Razón social solo se exige en filas de empresa (`COMPANY_REQUIRED_FIELDS`); la columna **Tipo** es opcional (acepta «Empresa»/«Persona natural», por defecto empresa) y si falta, el archivo debe traer Razón social; las columnas del responsable son opcionales y, si no vienen, no pisan los datos ya guardados. Como **todo externo registrado debe tener responsable**, las filas que llegan sin él reciben uno generado: `TDG-MAR-R` (`ExternalCompanyImporter::RESPONSIBLE_PREFIX`) + `DD-MM-YYYY` + correlativo de 3 dígitos que se reserva **una vez por importación** (todas las filas sin responsable de ese archivo comparten el mismo, y el `responsible_document_id` queda con esos tres dígitos). El correlativo se calcula mirando los responsables ya generados ese día (incluidos los borrados), solo se reserva si alguna fila lo necesita, y nunca pisa un responsable real ya registrado. La tabla viene **agrupada por `responsible_name`** (`defaultGroup`, colapsable), con un color estable por responsable — `ExternalCompanyResponsiblePresentation` lo deriva del hash del nombre y lo usa tanto en el badge de la columna como en el punto de color del encabezado del grupo, que además indica si el responsable viene de una importación o de un alta manual. Desde ahí, `SendExistingMassNotificationsBulkAction` (en `app/Filament/Actions/`) permite seleccionar externos —o un grupo completo con el checkbox del encabezado— y enviarles **una o varias notificaciones masivas ya creadas**, elegidas en un `CheckboxList` dentro del modal. Ese listado lo arma `ExistingMassNotificationOptions` (en `app/Services/Marketing/`) y **nunca carga el histórico completo**: trae como mucho `LIMIT` (5) campañas —las más recientes, o las que coinciden con el buscador del modal, que consulta en servidor con debounce— más las que el analista ya marcó (para no perderlas al buscar), sin la columna `copy` y descartando en SQL las campañas sin mensaje; el envío reutiliza cada campaña vía `MassNotificationDispatchService::dispatchExistingTo()` (no crea campañas nuevas) y se autoriza con la habilidad `sendAny` de `MassNotificationPolicy`.
+8. **Historial de envíos** (`NotificationDispatchLog`) — auditoría de entregas/fallas con mensajes de remediación para analistas y opción de reintento.
+9. **Roles y permisos** — RBAC propio (`MarketingRole` + `MarketingPermission`), sin Spatie ni paquete de terceros.
+10. **Dashboard** — `ApiHealthWidget`, `DatabaseHealthWidget` y `MarketingDashboardHealthIndicatorsWidget` (los tres vía el trait `InteractsWithMarketingHealthCheck` sobre `MarketingApiHealthService`) más `MarketingActivityHeatmapWidget`, alimentado por `MarketingDashboardHeatmapService`, que cruza `CorporateEvent` + `EditorialPublication` **locales** por día (no consulta el API externo).
 
 ## 7. Catálogo detallado del Marketing API externo (endpoints salientes)
 
@@ -214,7 +216,7 @@ Login, registro, reseteo de contraseña, verificación de email, 2FA y passkeys 
 
 - Login del panel: `/marketing/login` (página `App\Filament\Auth\Pages\Login`).
 - Páginas: `Dashboard`, `CorporateEventsCalendar`, `EditorialCalendar`.
-- CRUD/gestión (slugs reales de cada `Resource`): `notificaciones-cumpleanos`, `notificaciones-masivas`, `eventos-corporativos`, `grupos-clientes`, `cuentas-redes`, `publicaciones`, `roles-marketing`.
+- CRUD/gestión (slugs reales de cada `Resource`): `notificaciones-cumpleanos`, `notificaciones-masivas`, `eventos-corporativos`, `grupos-clientes`, `externos`, `cuentas-redes`, `publicaciones`, `roles-marketing`.
 - Historial: `historial-envios`.
 - Audiencias (solo lectura vía API): `agentes-corretaje`, `agencias-corretaje`, `agentes-viajes`, `agencias-viajes`, `afiliados-individuales`, `afiliados-corporativos`, `proveedores-naturales`, `proveedores-juridicos`, `colaboradores`.
 - Grupos de navegación (`MarketingPanelProvider::navigationGroups()`): **Operaciones**, **Audiencias TDG**, **Administración**.
@@ -225,7 +227,7 @@ El frontend no consume `/api/*` local; usa Livewire (`/livewire/update` u homól
 
 ### Persistidos localmente (con migración en `database/migrations`)
 
-`User`, `MarketingRole`, `BirthdayNotification`, `MassNotification`, `NotificationDispatchLog`, `CorporateEvent`, `CorporateEventRegistration`, `SocialAccount`, `EditorialPublication`, `ClientGroup`, `Client`.
+`User`, `MarketingRole`, `BirthdayNotification`, `MassNotification`, `NotificationDispatchLog`, `CorporateEvent`, `CorporateEventRegistration`, `SocialAccount`, `EditorialPublication`, `ClientGroup`, `Client`, `ExternalCompany`.
 
 ### API-backed (sin tabla, sin migración, sin timestamps)
 
@@ -235,14 +237,14 @@ Patrón común (ver `App\Models\TravelAgency` como referencia): `$incrementing =
 
 ## 10. Permisos y roles
 
-`App\Marketing\MarketingPermission` define las constantes de permiso, sus etiquetas/descripciones en español y los agrupa por área (`groups()`) para la UI de gestión de roles. Dominios de permiso: `social_accounts.*`, `publications.*` (incluye `publications.approve`), `calendar.view`, `roles.manage`, `birthday_notifications.*`, `mass_notifications.*`, `corporate_events.*`, `notification_logs.view`, `client_groups.*`.
+`App\Marketing\MarketingPermission` define las constantes de permiso, sus etiquetas/descripciones en español y los agrupa por área (`groups()`) para la UI de gestión de roles. Dominios de permiso: `social_accounts.*`, `publications.*` (incluye `publications.approve`), `calendar.view`, `roles.manage`, `birthday_notifications.*`, `mass_notifications.*`, `corporate_events.*`, `notification_logs.view`, `client_groups.*`, `external_companies.*`.
 
 `MarketingRole` guarda una lista saneada (`MarketingPermission::sanitize()`) de esos permisos. Roles sembrados por `database/seeders/MarketingRoleSeeder.php` (todos `is_system = true`):
 
 | Slug | Nombre | Alcance |
 |---|---|---|
 | `administrador` | Administrador de marketing | Todos los permisos (`MarketingPermission::all()`) |
-| `analista` | Analista de marketing | Redes, publicaciones, calendario, cumpleaños, masivas, eventos, logs, grupos de clientes (sin `roles.manage` ni `publications.approve`) |
+| `analista` | Analista de marketing | Redes, publicaciones, calendario, cumpleaños, masivas, eventos, logs, grupos de clientes, externos (sin `roles.manage` ni `publications.approve`) |
 | `aprobador` | Aprobador editorial | Ver cuentas/publicaciones/calendario + `publications.approve` |
 | `visor` | Visor autorizado | Solo lectura de cuentas, publicaciones y calendario |
 
@@ -304,7 +306,7 @@ Comando de simulación: `php artisan birthday:simulate-dispatch {notification} {
 4. Enums de dominio en `App\Marketing\`, implementando `HasLabel`/`HasColor`/`HasIcon` cuando la UI lo requiera (ver `PublicationStatus`, `BirthdayNotificationChannel`).
 5. Audiencias externas: patrón `fromApi()` + servicio que extiende `MarketingPaginatedApiService`. **No crear migraciones** para ellas.
 6. Autorización vía `MarketingPermission` + Policies + `hasMarketingPermission()` — nunca hardcodear checks de rol.
-7. Al crear registros de marketing desde el panel, usa el concern `App\Filament\Concerns\SetsMarketingAuthor` (setea `created_by_id` en `mutateFormDataBeforeCreate`) — ya se usa en las páginas `Create*` de `BirthdayNotification`, `SocialAccount`, `EditorialPublication`, `ClientGroup`, `CorporateEvent`, `MassNotification`.
+7. Al crear registros de marketing desde el panel, usa el concern `App\Filament\Concerns\SetsMarketingAuthor` (setea `created_by_id` en `mutateFormDataBeforeCreate`) — ya se usa en las páginas `Create*` de `BirthdayNotification`, `SocialAccount`, `EditorialPublication`, `ClientGroup`, `ExternalCompany`, `CorporateEvent`, `MassNotification`.
 8. El progreso de envíos se coordina vía cache/`DispatchProgressTracker` + el widget floater — **no** uses Events/Listeners de Laravel (no existen en este proyecto).
 9. El HTML de los correos se renderiza en esta app (`BirthdayNotificationEmailRenderer`, `MassNotificationEmailRenderer`, `CorporateEventInvitationEmailRenderer` según el flujo) y se envía vía el endpoint bulk del API externo — no basta con `Mail::send()`/la facade `Mail` sola.
 10. Tests Pest obligatorios por cada cambio; usa SQLite `:memory:` y, si el test toca la BD, adhiérete con `uses(SafeRefreshDatabase::class);` (ver sección 14).

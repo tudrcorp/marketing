@@ -2475,6 +2475,11 @@
     }
 
     html.fi:not(.dark) .marketing-heatmap-widget {
+        --heatmap-events: #e87d2f;
+        --heatmap-publications: #4f5bd5;
+        --heatmap-marker-bg: rgb(255 255 255 / 0.92);
+        --heatmap-marker-fg: #2d3250;
+
         @apply border-primary-300/65 bg-white;
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
@@ -2493,8 +2498,13 @@
 
     html.fi:not(.dark) .marketing-heatmap-widget__nav-btn,
     html.fi:not(.dark) .marketing-heatmap-widget__today-btn,
-    html.fi:not(.dark) .marketing-heatmap-widget__link {
+    html.fi:not(.dark) .marketing-heatmap-widget__link,
+    html.fi:not(.dark) .marketing-heatmap-widget__filters {
         @apply border-primary-400/55 bg-white shadow-sm;
+    }
+
+    html.fi:not(.dark) .marketing-heatmap-widget__filter--active {
+        @apply bg-primary-700 text-white;
     }
 
     html.fi:not(.dark) .marketing-heatmap-widget__weekdays {
@@ -2505,7 +2515,8 @@
         @apply text-secondary-800;
     }
 
-    html.fi:not(.dark) .marketing-heatmap-widget__month {
+    html.fi:not(.dark) .marketing-heatmap-widget__month,
+    html.fi:not(.dark) .marketing-heatmap-widget__stat-value {
         @apply text-secondary-950;
     }
 
@@ -2514,41 +2525,52 @@
     }
 
     html.fi:not(.dark) .marketing-heatmap-widget__cell--outside {
-        @apply border-secondary-200/70 bg-secondary-50/80 text-secondary-400 opacity-60;
+        @apply border-transparent bg-transparent text-secondary-400 opacity-45 shadow-none;
     }
 
     html.fi:not(.dark) .marketing-heatmap-widget__cell--today:not(.marketing-heatmap-widget__cell--outside) {
-        @apply border-primary-500/75 ring-2 ring-primary-400/40 ring-offset-1 ring-offset-white;
+        @apply border-primary-500/75;
         box-shadow:
-            inset 0 0 0 1px rgb(249 177 122 / 0.55),
+            inset 0 0 0 1.5px rgb(232 125 47 / 0.7),
             0 1px 3px rgb(103 111 157 / 0.12);
     }
 
     html.fi:not(.dark) .marketing-heatmap-widget__cell--intensity-0:not(.marketing-heatmap-widget__cell--outside) {
-        @apply border-secondary-300/75 bg-white text-secondary-900;
+        @apply border-secondary-300/75 bg-white;
     }
 
     html.fi:not(.dark) .marketing-heatmap-widget__cell--intensity-1:not(.marketing-heatmap-widget__cell--outside) {
-        @apply border-primary-400/65 bg-primary-200 text-primary-950;
+        @apply border-primary-400/65 bg-primary-100;
     }
 
     html.fi:not(.dark) .marketing-heatmap-widget__cell--intensity-2:not(.marketing-heatmap-widget__cell--outside) {
-        @apply border-primary-500/60 bg-primary-400 text-primary-950;
+        @apply border-primary-500/60 bg-primary-200;
     }
 
     html.fi:not(.dark) .marketing-heatmap-widget__cell--intensity-3:not(.marketing-heatmap-widget__cell--outside) {
-        @apply border-primary-600/70 bg-primary-600 text-white;
+        @apply border-primary-600/70 bg-primary-400;
     }
 
     html.fi:not(.dark) .marketing-heatmap-widget__cell--intensity-4:not(.marketing-heatmap-widget__cell--outside) {
-        @apply border-primary-800/75 bg-primary-800 text-white shadow-md;
+        @apply border-primary-800/75 bg-primary-600 shadow-md;
     }
 
-    html.fi:not(.dark) .marketing-heatmap-widget__legend {
+    html.fi:not(.dark) .marketing-heatmap-widget__cell--intensity-4 .marketing-heatmap-widget__day-number {
+        @apply text-white;
+    }
+
+    html.fi:not(.dark) .marketing-heatmap-widget__cell--selected:not(.marketing-heatmap-widget__cell--outside) {
+        box-shadow:
+            0 0 0 2px rgb(232 125 47 / 0.6),
+            0 12px 24px rgb(103 111 157 / 0.2);
+    }
+
+    html.fi:not(.dark) .marketing-heatmap-widget__legend-row {
         @apply border-secondary-300/70;
     }
 
-    html.fi:not(.dark) .marketing-heatmap-widget__legend-label {
+    html.fi:not(.dark) .marketing-heatmap-widget__legend-label,
+    html.fi:not(.dark) .marketing-heatmap-widget__key {
         @apply text-secondary-800;
     }
 
@@ -2556,11 +2578,11 @@
         @apply border-secondary-400/75;
     }
 
-    html.fi:not(.dark) .marketing-heatmap-widget__popover-surface {
-        @apply border-primary-300/60 bg-white shadow-xl;
+    html.fi:not(.dark) .marketing-heatmap-widget__detail {
+        @apply border-secondary-300/70 bg-white shadow-sm;
     }
 
-    html.fi:not(.dark) .marketing-heatmap-widget__popover-item {
+    html.fi:not(.dark) .marketing-heatmap-widget__item {
         @apply border-secondary-300/70 bg-white shadow-sm;
     }
 
@@ -5149,6 +5171,29 @@
         @apply border-t border-secondary-200 bg-secondary-50;
     }
 
+    /*
+     * El encabezado y el pie tienen fondo propio, y ese fondo cuadrado tapaba las
+     * esquinas redondeadas de la ventana del modal (en el tema oscuro no se nota porque
+     * comparten fondo con el modal). Se les da el mismo radio que Filament aplica a
+     * `.fi-modal-window`, excepto en los slide-over y en los modales a pantalla
+     * completa, que no llevan esquinas redondeadas.
+     */
+    .fi-body
+        .fi-modal:not(.fi-modal-slide-over):not(.fi-width-screen)
+        > .fi-modal-window-ctn
+        > .fi-modal-window
+        > .fi-modal-header {
+        @apply rounded-t-xl;
+    }
+
+    .fi-body
+        .fi-modal:not(.fi-modal-slide-over):not(.fi-width-screen)
+        > .fi-modal-window-ctn
+        > .fi-modal-window
+        > .fi-modal-footer {
+        @apply rounded-b-xl;
+    }
+
     html.fi:not(.dark) .fi-body .fi-dropdown-panel {
         @apply border border-secondary-300/80 bg-white shadow-lg;
     }
@@ -5329,7 +5374,13 @@
     }
 
     .marketing-heatmap-widget {
-        @apply relative overflow-visible rounded-2xl border p-5 sm:p-6;
+        --heatmap-events: #f9b17a;
+        --heatmap-publications: #a5b4fc;
+        --heatmap-marker-bg: rgb(16 19 33 / 0.55);
+        --heatmap-marker-fg: rgb(255 255 255 / 0.92);
+        --heatmap-cell-radius: 0.85rem;
+
+        @apply relative overflow-hidden rounded-2xl border p-5 sm:p-6;
         border-color: rgb(249 177 122 / 0.35);
         background: rgb(255 255 255 / 0.58);
         backdrop-filter: blur(24px) saturate(175%);
@@ -5348,12 +5399,19 @@
     }
 
     .marketing-heatmap-widget__glow {
-        @apply pointer-events-none absolute -top-20 right-0 h-40 w-40 rounded-full opacity-80 blur-3xl;
-        background: radial-gradient(circle, rgb(249 177 122 / 0.28), transparent 70%);
+        @apply pointer-events-none absolute -top-24 right-0 h-48 w-48 rounded-full opacity-80 blur-3xl;
+        background: radial-gradient(circle, rgb(249 177 122 / 0.3), transparent 70%);
     }
 
+    .marketing-heatmap-widget__glow--secondary {
+        @apply -bottom-24 left-0 top-auto right-auto h-56 w-56 opacity-70;
+        background: radial-gradient(circle, rgb(103 111 157 / 0.28), transparent 70%);
+    }
+
+    /* Cabecera ------------------------------------------------------------ */
+
     .marketing-heatmap-widget__header {
-        @apply relative mb-5 flex flex-wrap items-start justify-between gap-4;
+        @apply relative mb-4 flex flex-wrap items-start justify-between gap-4;
     }
 
     .marketing-heatmap-widget__heading {
@@ -5361,7 +5419,11 @@
     }
 
     .marketing-heatmap-widget__icon-wrap {
-        @apply flex size-11 shrink-0 items-center justify-center rounded-2xl border border-primary-300/40 bg-primary-500/14 text-primary-700 dark:border-primary-400/25 dark:text-primary-300;
+        @apply flex size-11 shrink-0 items-center justify-center rounded-2xl border border-primary-300/40 bg-primary-500/14 text-primary-700 transition-transform duration-300 dark:border-primary-400/25 dark:text-primary-300;
+    }
+
+    .marketing-heatmap-widget:hover .marketing-heatmap-widget__icon-wrap {
+        @apply -rotate-3 scale-105;
     }
 
     .marketing-heatmap-widget__icon {
@@ -5377,11 +5439,11 @@
     }
 
     .marketing-heatmap-widget__count {
-        @apply inline-flex min-w-6 items-center justify-center rounded-full bg-primary-500/15 px-2 py-0.5 text-xs font-semibold text-primary-700 dark:text-primary-300;
+        @apply inline-flex items-center justify-center rounded-full bg-primary-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-primary-700 dark:text-primary-300;
     }
 
     .marketing-heatmap-widget__subtitle {
-        @apply mt-1 max-w-2xl text-sm text-secondary-700 dark:text-gray-400;
+        @apply mt-1 max-w-2xl text-sm leading-relaxed text-secondary-700 dark:text-gray-400;
     }
 
     .marketing-heatmap-widget__actions {
@@ -5389,15 +5451,80 @@
     }
 
     .marketing-heatmap-widget__link {
-        @apply inline-flex items-center gap-1.5 rounded-full border border-secondary-300/60 bg-white/80 px-3 py-1.5 text-xs font-semibold text-secondary-800 no-underline transition hover:border-primary-300/50 hover:bg-white dark:border-secondary-500/35 dark:bg-secondary-900/55 dark:text-secondary-100 dark:hover:bg-secondary-800/70;
+        @apply inline-flex items-center gap-1.5 rounded-full border border-secondary-300/60 bg-white/80 px-3 py-1.5 text-xs font-semibold text-secondary-800 no-underline dark:border-secondary-500/35 dark:bg-secondary-900/55 dark:text-secondary-100;
+        transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    .marketing-heatmap-widget__link:hover {
+        @apply -translate-y-0.5 border-primary-300/60 bg-white dark:bg-secondary-800/75;
+        box-shadow: 0 8px 18px rgb(45 50 80 / 0.18);
+    }
+
+    .marketing-heatmap-widget__link:active {
+        @apply translate-y-0;
     }
 
     .marketing-heatmap-widget__link--primary {
         @apply border-primary-400/45 bg-primary-500/12 text-primary-800 dark:border-primary-400/35 dark:bg-primary-500/18 dark:text-primary-200;
     }
 
+    .marketing-heatmap-widget__link--primary:hover {
+        @apply bg-primary-500/22 dark:bg-primary-500/28;
+    }
+
+    /* Resumen del mes ----------------------------------------------------- */
+
+    .marketing-heatmap-widget__stats {
+        @apply relative mb-4 flex flex-wrap items-center gap-x-4 gap-y-2;
+    }
+
+    .marketing-heatmap-widget__stat {
+        @apply inline-flex items-center gap-1.5 text-xs text-secondary-700 dark:text-secondary-200;
+    }
+
+    .marketing-heatmap-widget__stat--action {
+        @apply cursor-pointer rounded-full border border-primary-300/40 bg-primary-500/10 px-2.5 py-1 text-primary-800 dark:border-primary-400/30 dark:bg-primary-500/12 dark:text-primary-200;
+        transition: background-color 160ms ease, border-color 160ms ease, transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .marketing-heatmap-widget__stat--action:hover {
+        @apply -translate-y-0.5 border-primary-400/60 bg-primary-500/20;
+    }
+
+    .marketing-heatmap-widget__stat-value {
+        @apply text-sm font-bold tabular-nums text-secondary-950 dark:text-white;
+    }
+
+    .marketing-heatmap-widget__stat--action .marketing-heatmap-widget__stat-value {
+        @apply text-xs text-primary-800 dark:text-primary-100;
+    }
+
+    .marketing-heatmap-widget__stat-label {
+        @apply text-[11px] font-medium uppercase tracking-wide text-secondary-600 dark:text-secondary-300;
+    }
+
+    .marketing-heatmap-widget__stat-icon {
+        @apply size-4 text-primary-600 dark:text-primary-300;
+    }
+
+    .marketing-heatmap-widget__stat-dot {
+        @apply inline-block size-2.5 shrink-0 rounded-full;
+        box-shadow: 0 0 0 3px rgb(249 177 122 / 0.12);
+    }
+
+    .marketing-heatmap-widget__stat-dot--events {
+        background: var(--heatmap-events);
+    }
+
+    .marketing-heatmap-widget__stat-dot--publications {
+        background: var(--heatmap-publications);
+        box-shadow: 0 0 0 3px rgb(165 180 252 / 0.14);
+    }
+
+    /* Cuerpo y barra de herramientas -------------------------------------- */
+
     .marketing-heatmap-widget__body {
-        @apply relative overflow-visible rounded-2xl border border-white/45 bg-white/45 p-4 dark:border-secondary-500/25 dark:bg-secondary-950/35;
+        @apply relative rounded-2xl border border-white/45 bg-white/45 p-4 dark:border-secondary-500/25 dark:bg-secondary-950/35;
     }
 
     .marketing-heatmap-widget__toolbar {
@@ -5409,20 +5536,73 @@
     }
 
     .marketing-heatmap-widget__nav-btn {
-        @apply inline-flex size-9 items-center justify-center rounded-full border border-secondary-300/50 bg-white/85 text-secondary-700 transition hover:border-primary-300/45 hover:text-primary-700 dark:border-secondary-500/35 dark:bg-secondary-900/60 dark:text-secondary-200;
+        @apply inline-flex size-9 items-center justify-center rounded-full border border-secondary-300/50 bg-white/85 text-secondary-700 dark:border-secondary-500/35 dark:bg-secondary-900/60 dark:text-secondary-200;
+        transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1), background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+    }
+
+    .marketing-heatmap-widget__nav-btn:hover {
+        @apply scale-105 border-primary-400/60 bg-primary-500/12 text-primary-700 dark:text-primary-200;
+    }
+
+    .marketing-heatmap-widget__nav-btn:active {
+        @apply scale-95;
     }
 
     .marketing-heatmap-widget__month {
-        @apply min-w-[10rem] text-center text-sm font-semibold capitalize text-secondary-900 dark:text-white;
+        @apply min-w-[9.5rem] text-center text-sm font-semibold capitalize text-secondary-900 dark:text-white;
     }
 
     .marketing-heatmap-widget__today-btn {
-        @apply rounded-full border border-primary-300/45 bg-primary-500/10 px-3 py-1.5 text-xs font-semibold text-primary-800 transition hover:bg-primary-500/18 dark:border-primary-400/35 dark:text-primary-200;
+        @apply inline-flex items-center gap-1 rounded-full border border-primary-300/45 bg-primary-500/10 px-3 py-1.5 text-xs font-semibold text-primary-800 dark:border-primary-400/35 dark:text-primary-200;
+        transition: background-color 160ms ease, transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+        animation: marketing-heatmap-pop 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    }
+
+    .marketing-heatmap-widget__today-btn:hover {
+        @apply -translate-y-0.5 bg-primary-500/20;
+    }
+
+    .marketing-heatmap-widget__filters {
+        @apply inline-flex items-center gap-1 rounded-full border border-secondary-300/50 bg-white/70 p-1 dark:border-secondary-500/30 dark:bg-secondary-900/50;
+    }
+
+    .marketing-heatmap-widget__filter {
+        @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold text-secondary-700 dark:text-secondary-300;
+        transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+    }
+
+    .marketing-heatmap-widget__filter:hover {
+        @apply bg-secondary-200/60 text-secondary-900 dark:bg-secondary-700/45 dark:text-white;
+    }
+
+    .marketing-heatmap-widget__filter--active {
+        @apply bg-primary-500/85 text-white dark:bg-primary-600/90;
+        box-shadow: 0 4px 12px rgb(232 125 47 / 0.28);
+    }
+
+    .marketing-heatmap-widget__filter--active:hover {
+        @apply bg-primary-500 text-white dark:bg-primary-600;
+    }
+
+    /* Rejilla -------------------------------------------------------------- */
+
+    .marketing-heatmap-widget__calendar {
+        @apply relative;
+        transition: opacity 180ms ease, filter 180ms ease;
+    }
+
+    .marketing-heatmap-widget__calendar--busy {
+        @apply pointer-events-none opacity-40;
+        filter: blur(1px);
+    }
+
+    .marketing-heatmap-widget__spinner {
+        @apply pointer-events-none absolute inset-0 z-20 flex items-center justify-center text-primary-600 dark:text-primary-300;
     }
 
     .marketing-heatmap-widget__weekdays,
     .marketing-heatmap-widget__week {
-        @apply grid grid-cols-7 gap-1.5 overflow-visible sm:gap-2;
+        @apply grid grid-cols-7 gap-1.5 sm:gap-2;
     }
 
     .marketing-heatmap-widget__weekdays {
@@ -5430,206 +5610,159 @@
     }
 
     .marketing-heatmap-widget__weekday {
-        @apply text-center text-[11px] font-semibold uppercase tracking-wide text-secondary-600 dark:text-secondary-300;
+        @apply cursor-default text-center text-[11px] font-semibold uppercase tracking-wider text-secondary-600 dark:text-secondary-300;
+    }
+
+    .marketing-heatmap-widget__weekday--weekend {
+        @apply text-primary-700/80 dark:text-primary-300/80;
     }
 
     .marketing-heatmap-widget__grid {
-        @apply flex flex-col gap-1.5 overflow-visible sm:gap-2;
+        @apply flex flex-col gap-1.5 sm:gap-2;
     }
 
     .marketing-heatmap-widget__cell {
-        @apply relative isolate flex min-h-[2.85rem] cursor-default flex-col items-center justify-center rounded-xl border border-secondary-200/70 bg-secondary-50/80 px-1 py-1.5 text-center sm:min-h-[3.15rem];
+        @apply relative flex min-h-[3.35rem] flex-col items-stretch justify-between border px-1.5 py-1.5 text-left sm:min-h-[3.85rem];
+        border-radius: var(--heatmap-cell-radius);
+        border-color: rgb(255 255 255 / 0.08);
+        background: rgb(255 255 255 / 0.04);
+        animation: marketing-heatmap-cell-in 380ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+        animation-delay: calc(var(--cell-index, 0) * 9ms);
+        transition:
+            transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+            box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+            background-color 200ms ease,
+            border-color 200ms ease;
+    }
+
+    button.marketing-heatmap-widget__cell {
+        @apply cursor-pointer;
+    }
+
+    .marketing-heatmap-widget__cell:focus-visible {
+        @apply outline-none;
     }
 
     .marketing-heatmap-widget__cell--outside {
-        @apply border-transparent bg-transparent opacity-35;
+        @apply pointer-events-none border-transparent bg-transparent opacity-30;
     }
 
-    .marketing-heatmap-widget__cell--today:not(.marketing-heatmap-widget__cell--outside) {
-        @apply border-primary-500/55 shadow-[inset_0_0_0_1px_rgb(249_177_122_/_0.35)];
+    .marketing-heatmap-widget__cell--weekend:not(.marketing-heatmap-widget__cell--outside) {
+        background-image: linear-gradient(160deg, rgb(103 111 157 / 0.1), transparent 60%);
     }
 
     .marketing-heatmap-widget__cell--intensity-0:not(.marketing-heatmap-widget__cell--outside) {
-        @apply border-secondary-200/60 bg-white/90 dark:border-secondary-600/35 dark:bg-secondary-900/45;
+        @apply border-secondary-200/60 bg-white/90 dark:border-secondary-600/30 dark:bg-secondary-900/40;
     }
 
     .marketing-heatmap-widget__cell--intensity-1:not(.marketing-heatmap-widget__cell--outside) {
-        @apply border-primary-200/70 bg-primary-100/85 text-primary-900 dark:border-primary-500/25 dark:bg-primary-500/12;
+        @apply border-primary-200/70 bg-primary-100/85 dark:border-primary-500/25;
+    }
+
+    .dark .marketing-heatmap-widget__cell--intensity-1:not(.marketing-heatmap-widget__cell--outside) {
+        background: linear-gradient(155deg, rgb(249 177 122 / 0.2), rgb(249 177 122 / 0.1));
     }
 
     .marketing-heatmap-widget__cell--intensity-2:not(.marketing-heatmap-widget__cell--outside) {
-        @apply border-primary-300/70 bg-primary-300/55 text-primary-950 dark:border-primary-400/35 dark:bg-primary-500/24;
+        @apply border-primary-300/70 bg-primary-200/80 dark:border-primary-400/30;
+    }
+
+    .dark .marketing-heatmap-widget__cell--intensity-2:not(.marketing-heatmap-widget__cell--outside) {
+        background: linear-gradient(155deg, rgb(249 177 122 / 0.34), rgb(249 177 122 / 0.18));
     }
 
     .marketing-heatmap-widget__cell--intensity-3:not(.marketing-heatmap-widget__cell--outside) {
-        @apply border-primary-500/55 bg-primary-500/72 text-white dark:border-primary-400/45 dark:bg-primary-600/78;
+        @apply border-primary-400/70 bg-primary-400/70 dark:border-primary-400/40;
+    }
+
+    .dark .marketing-heatmap-widget__cell--intensity-3:not(.marketing-heatmap-widget__cell--outside) {
+        background: linear-gradient(155deg, rgb(249 177 122 / 0.52), rgb(245 154 85 / 0.3));
     }
 
     .marketing-heatmap-widget__cell--intensity-4:not(.marketing-heatmap-widget__cell--outside) {
-        @apply border-primary-700/65 bg-primary-700 text-white shadow-sm dark:border-primary-500/55 dark:bg-primary-700;
+        @apply border-primary-600/70 bg-primary-500/85 dark:border-primary-400/55;
+    }
+
+    .dark .marketing-heatmap-widget__cell--intensity-4:not(.marketing-heatmap-widget__cell--outside) {
+        background: linear-gradient(155deg, rgb(249 177 122 / 0.78), rgb(232 125 47 / 0.48));
+    }
+
+    .marketing-heatmap-widget__cell--today:not(.marketing-heatmap-widget__cell--outside) {
+        box-shadow: inset 0 0 0 1.5px rgb(249 177 122 / 0.85);
+    }
+
+    .marketing-heatmap-widget__cell--today .marketing-heatmap-widget__day-number {
+        @apply text-primary-700 dark:text-primary-200;
     }
 
     @media (hover: hover) and (pointer: fine) {
-        .marketing-heatmap-widget__cell:not(.marketing-heatmap-widget__cell--outside):hover,
-        .marketing-heatmap-widget__cell:not(.marketing-heatmap-widget__cell--outside):focus-visible {
-            @apply z-20 scale-[1.03] shadow-md;
-            transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1);
+        .marketing-heatmap-widget__cell--previewing:not(.marketing-heatmap-widget__cell--outside) {
+            @apply z-10 -translate-y-0.5 scale-[1.035] border-primary-400/70;
+            box-shadow:
+                0 10px 22px rgb(20 24 40 / 0.28),
+                inset 0 1px 0 rgb(255 255 255 / 0.16);
         }
+    }
+
+    .marketing-heatmap-widget__cell--selected:not(.marketing-heatmap-widget__cell--outside) {
+        @apply z-10 border-primary-500/80;
+        box-shadow:
+            0 0 0 2px rgb(249 177 122 / 0.55),
+            0 12px 26px rgb(232 125 47 / 0.22);
+    }
+
+    .marketing-heatmap-widget__cell:active:not(.marketing-heatmap-widget__cell--outside) {
+        @apply scale-[0.98];
     }
 
     .marketing-heatmap-widget__day-number {
-        @apply text-[12px] font-bold leading-none text-inherit;
+        @apply text-[12px] font-bold leading-none text-secondary-800 dark:text-secondary-100;
+        transition: color 180ms ease;
     }
 
-    .marketing-heatmap-widget__popover {
-        @apply pointer-events-none absolute top-[calc(100%+0.4rem)] left-1/2 z-50 w-[17.5rem] max-w-[min(17.5rem,calc(100vw-2rem))];
-        opacity: 0;
-        visibility: hidden;
-        transform: translate3d(-50%, -0.35rem, 0) scale(0.96);
-        transition:
-            opacity 160ms cubic-bezier(0.22, 1, 0.36, 1),
-            transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
-            visibility 0ms linear 200ms;
-        will-change: opacity, transform;
-        contain: layout style paint;
+    .marketing-heatmap-widget__cell--intensity-3 .marketing-heatmap-widget__day-number,
+    .marketing-heatmap-widget__cell--intensity-4 .marketing-heatmap-widget__day-number {
+        @apply text-secondary-950 dark:text-white;
     }
 
-    .marketing-heatmap-widget__popover--start {
-        @apply left-0;
-        transform: translate3d(0, -0.35rem, 0) scale(0.96);
+    .marketing-heatmap-widget__markers {
+        @apply mt-1 flex min-h-[0.95rem] flex-wrap items-center gap-1;
     }
 
-    .marketing-heatmap-widget__popover--end {
-        @apply right-0 left-auto;
-        transform: translate3d(0, -0.35rem, 0) scale(0.96);
+    .marketing-heatmap-widget__marker {
+        @apply inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10px] font-bold leading-none tabular-nums;
+        background: var(--heatmap-marker-bg);
+        color: var(--heatmap-marker-fg);
     }
 
-    @media (hover: hover) and (pointer: fine) {
-        .marketing-heatmap-widget__cell:not(.marketing-heatmap-widget__cell--outside):hover .marketing-heatmap-widget__popover,
-        .marketing-heatmap-widget__cell:not(.marketing-heatmap-widget__cell--outside):focus-within .marketing-heatmap-widget__popover {
-            opacity: 1;
-            visibility: visible;
-            pointer-events: auto;
-            transform: translate3d(-50%, 0, 0) scale(1);
-            transition:
-                opacity 180ms cubic-bezier(0.22, 1, 0.36, 1),
-                transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
-                visibility 0ms linear 0ms;
-        }
-
-        .marketing-heatmap-widget__cell:not(.marketing-heatmap-widget__cell--outside):hover .marketing-heatmap-widget__popover--start,
-        .marketing-heatmap-widget__cell:not(.marketing-heatmap-widget__cell--outside):focus-within .marketing-heatmap-widget__popover--start {
-            transform: translate3d(0, 0, 0) scale(1);
-        }
-
-        .marketing-heatmap-widget__cell:not(.marketing-heatmap-widget__cell--outside):hover .marketing-heatmap-widget__popover--end,
-        .marketing-heatmap-widget__cell:not(.marketing-heatmap-widget__cell--outside):focus-within .marketing-heatmap-widget__popover--end {
-            transform: translate3d(0, 0, 0) scale(1);
-        }
+    .marketing-heatmap-widget__marker-dot {
+        @apply inline-block size-1.5 rounded-full;
     }
 
-    @media (prefers-reduced-motion: reduce) {
-        .marketing-heatmap-widget__cell,
-        .marketing-heatmap-widget__popover {
-            transition: none !important;
-        }
-
-        .marketing-heatmap-widget__cell:not(.marketing-heatmap-widget__cell--outside):hover,
-        .marketing-heatmap-widget__cell:not(.marketing-heatmap-widget__cell--outside):focus-visible {
-            transform: none;
-        }
+    .marketing-heatmap-widget__marker--events .marketing-heatmap-widget__marker-dot {
+        background: var(--heatmap-events);
     }
 
-    .marketing-heatmap-widget__popover-surface {
-        @apply overflow-hidden rounded-2xl border border-primary-300/35 bg-white/95 shadow-2xl backdrop-blur-xl dark:border-primary-400/20 dark:bg-secondary-950/95;
-        box-shadow:
-            0 18px 40px rgb(45 50 80 / 0.18),
-            inset 0 1px 0 rgb(255 255 255 / 0.85);
+    .marketing-heatmap-widget__marker--publications .marketing-heatmap-widget__marker-dot {
+        background: var(--heatmap-publications);
     }
 
-    .marketing-heatmap-widget__popover-header {
-        @apply flex items-start justify-between gap-3 border-b border-secondary-200/70 px-3.5 py-3 dark:border-secondary-600/35;
+    /* Leyenda -------------------------------------------------------------- */
+
+    .marketing-heatmap-widget__legend-row {
+        @apply mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-dashed border-secondary-300/45 pt-3 dark:border-secondary-500/30;
     }
 
-    .marketing-heatmap-widget__popover-date {
-        @apply text-xs font-semibold capitalize leading-snug text-secondary-900 dark:text-white;
+    .marketing-heatmap-widget__keys {
+        @apply flex flex-wrap items-center gap-3;
     }
 
-    .marketing-heatmap-widget__popover-summary {
-        @apply shrink-0 rounded-full bg-primary-500/12 px-2 py-0.5 text-[10px] font-semibold text-primary-800 dark:bg-primary-500/20 dark:text-primary-200;
-    }
-
-    .marketing-heatmap-widget__popover-body {
-        @apply max-h-56 space-y-3 overflow-y-auto overscroll-contain px-3.5 py-3;
-        scrollbar-width: thin;
-    }
-
-    .marketing-heatmap-widget__popover-empty {
-        @apply text-xs text-secondary-600 dark:text-secondary-300;
-    }
-
-    .marketing-heatmap-widget__popover-section-title {
-        @apply mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-secondary-700 dark:text-secondary-300;
-    }
-
-    .marketing-heatmap-widget__popover-list {
-        @apply space-y-2;
-    }
-
-    .marketing-heatmap-widget__popover-item {
-        @apply rounded-xl border border-secondary-200/70 bg-secondary-50/80 px-3 py-2.5 dark:border-secondary-600/35 dark:bg-secondary-900/45;
-    }
-
-    .marketing-heatmap-widget__popover-item-top {
-        @apply mb-1 flex items-center justify-between gap-2;
-    }
-
-    .marketing-heatmap-widget__popover-time {
-        @apply text-[11px] font-semibold tabular-nums text-primary-700 dark:text-primary-300;
-    }
-
-    .marketing-heatmap-widget__popover-badge {
-        @apply rounded-full px-2 py-0.5 text-[10px] font-semibold;
-    }
-
-    .marketing-heatmap-widget__popover-badge--gray {
-        @apply bg-gray-500/12 text-gray-700 dark:bg-gray-400/15 dark:text-gray-200;
-    }
-
-    .marketing-heatmap-widget__popover-badge--info {
-        @apply bg-info-500/12 text-info-800 dark:bg-info-400/15 dark:text-info-200;
-    }
-
-    .marketing-heatmap-widget__popover-badge--primary {
-        @apply bg-primary-500/12 text-primary-800 dark:bg-primary-400/15 dark:text-primary-200;
-    }
-
-    .marketing-heatmap-widget__popover-badge--warning {
-        @apply bg-warning-500/12 text-warning-800 dark:bg-warning-400/15 dark:text-warning-200;
-    }
-
-    .marketing-heatmap-widget__popover-badge--success {
-        @apply bg-success-500/12 text-success-800 dark:bg-success-400/15 dark:text-success-200;
-    }
-
-    .marketing-heatmap-widget__popover-badge--danger {
-        @apply bg-danger-500/12 text-danger-800 dark:bg-danger-400/15 dark:text-danger-200;
-    }
-
-    .marketing-heatmap-widget__popover-item-title {
-        @apply text-xs font-semibold leading-snug text-secondary-950 dark:text-white;
-    }
-
-    .marketing-heatmap-widget__popover-item-meta {
-        @apply mt-1 flex items-center gap-1.5 text-[11px] text-secondary-600 dark:text-secondary-300;
-    }
-
-    .marketing-heatmap-widget__popover-item-venue {
-        @apply mt-1.5 flex items-center gap-1 text-[11px] text-secondary-700 dark:text-secondary-300;
+    .marketing-heatmap-widget__key {
+        @apply inline-flex items-center gap-1.5 text-[11px] font-medium text-secondary-700 dark:text-secondary-300;
     }
 
     .marketing-heatmap-widget__legend {
-        @apply mt-4 flex flex-wrap items-center justify-center gap-3 border-t border-dashed border-secondary-300/45 pt-4 dark:border-secondary-500/30;
+        @apply flex items-center gap-2;
     }
 
     .marketing-heatmap-widget__legend-label {
@@ -5641,6 +5774,225 @@
     }
 
     .marketing-heatmap-widget__legend-cell {
-        @apply size-4 rounded-md border;
+        @apply size-4 cursor-help rounded-md border;
+        transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .marketing-heatmap-widget__legend-cell:hover {
+        @apply scale-125;
+    }
+
+    /* Panel de detalle ----------------------------------------------------- */
+
+    .marketing-heatmap-widget__details {
+        @apply relative mt-4;
+    }
+
+    .marketing-heatmap-widget__detail {
+        @apply rounded-2xl border border-secondary-300/45 bg-white/70 p-4 dark:border-secondary-500/25 dark:bg-secondary-950/45;
+    }
+
+    .marketing-heatmap-widget__detail--in {
+        animation: marketing-heatmap-detail-in 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    }
+
+    .marketing-heatmap-widget__detail-header {
+        @apply flex flex-wrap items-start justify-between gap-3;
+    }
+
+    .marketing-heatmap-widget__detail-heading {
+        @apply flex min-w-0 items-center gap-3;
+    }
+
+    .marketing-heatmap-widget__detail-daynum {
+        @apply flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary-400/40 bg-primary-500/12 text-base font-bold tabular-nums text-primary-800 dark:border-primary-400/30 dark:text-primary-200;
+    }
+
+    .marketing-heatmap-widget__detail-date {
+        @apply flex flex-wrap items-center gap-2 text-sm font-semibold capitalize text-secondary-950 dark:text-white;
+    }
+
+    .marketing-heatmap-widget__detail-chip {
+        @apply rounded-full bg-primary-500/18 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-800 dark:text-primary-200;
+    }
+
+    .marketing-heatmap-widget__detail-chip--muted {
+        @apply bg-secondary-500/15 text-secondary-700 dark:bg-secondary-400/15 dark:text-secondary-200;
+    }
+
+    .marketing-heatmap-widget__detail-summary {
+        @apply mt-0.5 text-xs text-secondary-600 dark:text-secondary-300;
+    }
+
+    .marketing-heatmap-widget__detail-actions {
+        @apply flex flex-wrap items-center gap-2;
+    }
+
+    .marketing-heatmap-widget__detail-action {
+        @apply inline-flex items-center gap-1 rounded-full border border-dashed border-secondary-400/50 px-2.5 py-1 text-[11px] font-semibold text-secondary-700 no-underline dark:border-secondary-500/40 dark:text-secondary-200;
+        transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease, transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .marketing-heatmap-widget__detail-action:hover {
+        @apply -translate-y-0.5 border-solid border-primary-400/70 bg-primary-500/12 text-primary-800 dark:text-primary-200;
+    }
+
+    .marketing-heatmap-widget__detail-empty {
+        @apply mt-3 flex items-center gap-2 rounded-xl border border-dashed border-secondary-300/60 px-3 py-4 text-xs text-secondary-600 dark:border-secondary-500/30 dark:text-secondary-300;
+    }
+
+    .marketing-heatmap-widget__detail-body {
+        @apply mt-3 grid gap-4;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+    }
+
+    .marketing-heatmap-widget__detail-section-title {
+        @apply mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-secondary-700 dark:text-secondary-300;
+    }
+
+    .marketing-heatmap-widget__detail-section-count {
+        @apply inline-flex min-w-[1.15rem] items-center justify-center rounded-full bg-secondary-500/15 px-1.5 text-[10px] font-bold tabular-nums text-secondary-800 dark:bg-secondary-400/15 dark:text-secondary-100;
+    }
+
+    .marketing-heatmap-widget__detail-list {
+        @apply space-y-2;
+    }
+
+    .marketing-heatmap-widget__item {
+        @apply relative block overflow-hidden rounded-xl border border-secondary-200/70 bg-secondary-50/80 px-3 py-2.5 no-underline dark:border-secondary-600/35 dark:bg-secondary-900/45;
+        transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    .marketing-heatmap-widget__item::before {
+        @apply absolute inset-y-0 left-0 w-1;
+        content: '';
+        background: var(--heatmap-events);
+        opacity: 0.75;
+        transition: width 180ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .marketing-heatmap-widget__item--publications::before {
+        background: var(--heatmap-publications);
+    }
+
+    .marketing-heatmap-widget__item:not(.marketing-heatmap-widget__item--static):hover {
+        @apply -translate-y-0.5 border-primary-400/50 bg-white dark:bg-secondary-800/70;
+        box-shadow: 0 10px 22px rgb(20 24 40 / 0.2);
+    }
+
+    .marketing-heatmap-widget__item:not(.marketing-heatmap-widget__item--static):hover::before {
+        @apply w-1.5;
+    }
+
+    .marketing-heatmap-widget__item--static {
+        @apply cursor-default;
+    }
+
+    .marketing-heatmap-widget__item-top {
+        @apply mb-1 flex items-center justify-between gap-2;
+    }
+
+    .marketing-heatmap-widget__item-time {
+        @apply text-[11px] font-semibold tabular-nums text-primary-700 dark:text-primary-300;
+    }
+
+    .marketing-heatmap-widget__item-title {
+        @apply pr-4 text-xs font-semibold leading-snug text-secondary-950 dark:text-white;
+    }
+
+    .marketing-heatmap-widget__item-meta {
+        @apply mt-1 flex items-center gap-1.5 text-[11px] text-secondary-600 dark:text-secondary-300;
+    }
+
+    .marketing-heatmap-widget__item-arrow {
+        @apply absolute right-2.5 bottom-2.5 text-secondary-500 opacity-0 dark:text-secondary-300;
+        transition: opacity 180ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+        transform: translate(-0.25rem, 0.25rem);
+    }
+
+    .marketing-heatmap-widget__item:hover .marketing-heatmap-widget__item-arrow {
+        @apply text-primary-700 opacity-100 dark:text-primary-300;
+        transform: translate(0, 0);
+    }
+
+    .marketing-heatmap-widget__badge {
+        @apply shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold;
+    }
+
+    .marketing-heatmap-widget__badge--gray {
+        @apply bg-gray-500/12 text-gray-700 dark:bg-gray-400/15 dark:text-gray-200;
+    }
+
+    .marketing-heatmap-widget__badge--info {
+        @apply bg-info-500/12 text-info-800 dark:bg-info-400/15 dark:text-info-200;
+    }
+
+    .marketing-heatmap-widget__badge--primary {
+        @apply bg-primary-500/12 text-primary-800 dark:bg-primary-400/15 dark:text-primary-200;
+    }
+
+    .marketing-heatmap-widget__badge--warning {
+        @apply bg-warning-500/12 text-warning-800 dark:bg-warning-400/15 dark:text-warning-200;
+    }
+
+    .marketing-heatmap-widget__badge--success {
+        @apply bg-success-500/12 text-success-800 dark:bg-success-400/15 dark:text-success-200;
+    }
+
+    .marketing-heatmap-widget__badge--danger {
+        @apply bg-danger-500/12 text-danger-800 dark:bg-danger-400/15 dark:text-danger-200;
+    }
+
+    /* Animaciones ---------------------------------------------------------- */
+
+    @keyframes marketing-heatmap-cell-in {
+        from {
+            opacity: 0;
+            transform: translateY(0.4rem) scale(0.96);
+        }
+
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+
+    @keyframes marketing-heatmap-detail-in {
+        from {
+            opacity: 0;
+            transform: translateY(0.35rem);
+        }
+
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+
+    @keyframes marketing-heatmap-pop {
+        from {
+            opacity: 0;
+            transform: scale(0.85);
+        }
+
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .marketing-heatmap-widget *,
+        .marketing-heatmap-widget *::before {
+            animation-duration: 1ms !important;
+            animation-delay: 0ms !important;
+            transition-duration: 1ms !important;
+        }
+
+        .marketing-heatmap-widget__cell--previewing,
+        .marketing-heatmap-widget__item:hover,
+        .marketing-heatmap-widget__link:hover {
+            transform: none !important;
+        }
     }
 }

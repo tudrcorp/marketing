@@ -12,6 +12,7 @@ class MarketingAudienceContactCollector
 
     public function __construct(
         private ClientGroupContactCollector $clientGroupContactCollector,
+        private ExternalCompanyContactCollector $externalCompanyContactCollector,
     ) {}
 
     /**
@@ -59,6 +60,10 @@ class MarketingAudienceContactCollector
     {
         if ($audience === BirthdayNotificationAudience::ClientGroups) {
             return $this->clientGroupContactCollector->collect();
+        }
+
+        if ($audience === BirthdayNotificationAudience::Externals) {
+            return $this->externalCompanyContactCollector->collect();
         }
 
         $profile = MassNotificationAudienceProfile::for($audience);

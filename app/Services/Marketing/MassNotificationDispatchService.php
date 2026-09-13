@@ -170,11 +170,28 @@ class MassNotificationDispatchService
         MassNotification $notification,
         User $sentBy,
     ): MassNotificationDispatchResult {
-        $recipients = $this->resolveRecipientsForNotification($notification);
-        $source = filled($notification->recipient_ids)
-            ? NotificationDispatchSource::MassIndividual
-            : NotificationDispatchSource::MassAudience;
+        return $this->dispatchExistingTo(
+            notification: $notification,
+            recipients: $this->resolveRecipientsForNotification($notification),
+            sentBy: $sentBy,
+            source: filled($notification->recipient_ids)
+                ? NotificationDispatchSource::MassIndividual
+                : NotificationDispatchSource::MassAudience,
+        );
+    }
 
+    /**
+     * Envía una campaña ya creada a un conjunto de destinatarios resuelto por quien llama
+     * (por ejemplo, los externos seleccionados en la tabla), sin tocar la campaña original.
+     *
+     * @param  list<MassNotificationRecipient>  $recipients
+     */
+    public function dispatchExistingTo(
+        MassNotification $notification,
+        array $recipients,
+        User $sentBy,
+        NotificationDispatchSource $source = NotificationDispatchSource::MassIndividual,
+    ): MassNotificationDispatchResult {
         if ($recipients === []) {
             $emptyResult = new MassNotificationChannelResult(
                 channel: $notification->channelEnums()[0] ?? BirthdayNotificationChannel::Email,
@@ -834,7 +851,7 @@ class MassNotificationDispatchService
     private function usesClientGroupRouting(array $recipients): bool
     {
         return collect($recipients)
-            ->contains(fn (MassNotificationRecipient $recipient): bool => $recipient->audience === BirthdayNotificationAudience::ClientGroups);
+            ->contains(fn (MassNotificationRecipient $recipient): bool => $recipient->audience->usesResponsibleReplyRouting());
     }
 
     private function startProgressRun(User $sentBy, MassNotification $notification, int $recipientCount): ?string

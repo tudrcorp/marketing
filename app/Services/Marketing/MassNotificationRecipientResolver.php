@@ -6,15 +6,17 @@ use App\Marketing\BirthdayNotificationAudience;
 use App\Marketing\MassNotificationAudienceProfile;
 use App\Marketing\MassNotificationRecipient;
 use App\Models\Client;
+use App\Models\ExternalCompany;
 
 class MassNotificationRecipientResolver
 {
     public function __construct(
         private ClientGroupContactCollector $clientGroupContactCollector,
+        private ExternalCompanyContactCollector $externalCompanyContactCollector,
     ) {}
 
     /**
-     * @param  list<array<string, mixed>|Client>  $records
+     * @param  list<array<string, mixed>|Client|ExternalCompany>  $records
      * @return list<MassNotificationRecipient>
      */
     public function resolveMany(BirthdayNotificationAudience $audience, array $records): array
@@ -22,6 +24,14 @@ class MassNotificationRecipientResolver
         if ($audience === BirthdayNotificationAudience::ClientGroups) {
             return collect($records)
                 ->map(fn (mixed $record): ?MassNotificationRecipient => $this->resolveClientGroupRecord($record))
+                ->filter()
+                ->values()
+                ->all();
+        }
+
+        if ($audience === BirthdayNotificationAudience::Externals) {
+            return collect($records)
+                ->map(fn (mixed $record): ?MassNotificationRecipient => $this->resolveExternalCompanyRecord($record))
                 ->filter()
                 ->values()
                 ->all();
@@ -51,6 +61,22 @@ class MassNotificationRecipientResolver
         $client->loadMissing('clientGroup');
 
         return $this->clientGroupContactCollector->resolveRecipient($client);
+    }
+
+    public function resolveExternalCompanyRecord(mixed $record): ?MassNotificationRecipient
+    {
+        $company = match (true) {
+            $record instanceof ExternalCompany => $record,
+            is_numeric($record) => ExternalCompany::query()->find((int) $record),
+            is_array($record) && filled($record['id'] ?? null) => ExternalCompany::query()->find((int) $record['id']),
+            default => null,
+        };
+
+        if ($company === null) {
+            return null;
+        }
+
+        return $this->externalCompanyContactCollector->resolveRecipient($company);
     }
 
     /**

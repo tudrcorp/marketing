@@ -110,6 +110,14 @@ class BirthdayNotificationPresentation
                     BirthdayNotificationAudience::LegalSuppliers,
                 ],
             ],
+            [
+                'label' => 'Audiencias locales',
+                'icon' => 'heroicon-o-building-office-2',
+                'audiences' => [
+                    BirthdayNotificationAudience::ClientGroups,
+                    BirthdayNotificationAudience::Externals,
+                ],
+            ],
         ];
 
         return collect($groups)

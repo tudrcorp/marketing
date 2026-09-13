@@ -19,6 +19,7 @@ enum BirthdayNotificationAudience: string implements HasIcon, HasLabel
     case NaturalSuppliers = 'natural_suppliers';
     case LegalSuppliers = 'legal_suppliers';
     case ClientGroups = 'client_groups';
+    case Externals = 'externals';
 
     public function getLabel(): string
     {
@@ -34,6 +35,7 @@ enum BirthdayNotificationAudience: string implements HasIcon, HasLabel
             self::NaturalSuppliers => 'Proveedores naturales',
             self::LegalSuppliers => 'Proveedores jurídicos',
             self::ClientGroups => 'Grupos de clientes',
+            self::Externals => 'Externos',
         };
     }
 
@@ -49,6 +51,15 @@ enum BirthdayNotificationAudience: string implements HasIcon, HasLabel
             self::NaturalSuppliers => Heroicon::OutlinedUserCircle,
             self::LegalSuppliers => Heroicon::OutlinedBuildingOffice,
             self::ClientGroups => Heroicon::OutlinedUserGroup,
+            self::Externals => Heroicon::OutlinedBuildingOffice2,
+        };
+    }
+
+    public function usesResponsibleReplyRouting(): bool
+    {
+        return match ($this) {
+            self::ClientGroups, self::Externals => true,
+            default => false,
         };
     }
 }

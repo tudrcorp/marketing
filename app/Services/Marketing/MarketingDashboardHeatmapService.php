@@ -2,11 +2,14 @@
 
 namespace App\Services\Marketing;
 
+use App\Filament\Resources\CorporateEvents\CorporateEventResource;
+use App\Filament\Resources\EditorialPublications\EditorialPublicationResource;
 use App\Marketing\CorporateEventStatus;
 use App\Marketing\PublicationStatus;
 use App\Models\CorporateEvent;
 use App\Models\EditorialPublication;
 use Illuminate\Support\Carbon;
+use Throwable;
 
 class MarketingDashboardHeatmapService
 {
@@ -23,6 +26,8 @@ class MarketingDashboardHeatmapService
      *         intensity: int,
      *         plan: array{
      *             events: list<array{
+     *                 id: int,
+     *                 url: ?string,
      *                 time: string,
      *                 title: string,
      *                 type: ?string,
@@ -32,6 +37,8 @@ class MarketingDashboardHeatmapService
      *                 venue: ?string,
      *             }>,
      *             publications: list<array{
+     *                 id: int,
+     *                 url: ?string,
      *                 time: string,
      *                 title: string,
      *                 platform: ?string,
@@ -117,7 +124,23 @@ class MarketingDashboardHeatmapService
     }
 
     /**
+     * Resuelve el enlace al recurso Filament del registro, o null si la ruta no está disponible.
+     *
+     * @param  class-string  $resource
+     */
+    private function resourceUrl(string $resource, string $page, int|string $key): ?string
+    {
+        try {
+            return $resource::getUrl($page, ['record' => $key]);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * @return array<string, list<array{
+     *     id: int,
+     *     url: ?string,
      *     time: string,
      *     title: string,
      *     type: ?string,
@@ -135,7 +158,7 @@ class MarketingDashboardHeatmapService
             ->whereBetween('starts_at', [$rangeStart, $rangeEnd->copy()->endOfDay()])
             ->whereNot('status', CorporateEventStatus::Cancelled->value)
             ->orderBy('starts_at')
-            ->get(['title', 'event_type', 'modality', 'status', 'starts_at', 'venue_name'])
+            ->get(['id', 'title', 'event_type', 'modality', 'status', 'starts_at', 'venue_name'])
             ->groupBy(fn (CorporateEvent $event): string => $event->starts_at
                 ->timezone($timezone)
                 ->format('Y-m-d'))
@@ -144,6 +167,8 @@ class MarketingDashboardHeatmapService
                     $status = $event->statusEnum();
 
                     return [
+                        'id' => $event->getKey(),
+                        'url' => $this->resourceUrl(CorporateEventResource::class, 'view', $event->getKey()),
                         'time' => $event->starts_at->timezone($timezone)->format('H:i'),
                         'title' => $event->title,
                         'type' => $event->typeEnum()?->getLabel(),
@@ -160,6 +185,8 @@ class MarketingDashboardHeatmapService
 
     /**
      * @return array<string, list<array{
+     *     id: int,
+     *     url: ?string,
      *     time: string,
      *     title: string,
      *     platform: ?string,
@@ -178,7 +205,7 @@ class MarketingDashboardHeatmapService
             ->whereBetween('scheduled_at', [$rangeStart, $rangeEnd->copy()->endOfDay()])
             ->whereNot('status', PublicationStatus::Cancelled->value)
             ->orderBy('scheduled_at')
-            ->get(['title', 'status', 'scheduled_at', 'social_account_id'])
+            ->get(['id', 'title', 'status', 'scheduled_at', 'social_account_id'])
             ->groupBy(fn (EditorialPublication $publication): string => $publication->scheduled_at
                 ->timezone($timezone)
                 ->format('Y-m-d'))
@@ -188,6 +215,8 @@ class MarketingDashboardHeatmapService
                     $platform = $publication->socialAccount?->platform;
 
                     return [
+                        'id' => $publication->getKey(),
+                        'url' => $this->resourceUrl(EditorialPublicationResource::class, 'edit', $publication->getKey()),
                         'time' => $publication->scheduled_at->timezone($timezone)->format('H:i'),
                         'title' => $publication->title,
                         'platform' => $platform?->getLabel(),

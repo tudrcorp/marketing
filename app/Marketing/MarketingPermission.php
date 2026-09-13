@@ -36,6 +36,10 @@ class MarketingPermission
 
     public const ManageClientGroups = 'client_groups.manage';
 
+    public const ViewExternalCompanies = 'external_companies.view';
+
+    public const ManageExternalCompanies = 'external_companies.manage';
+
     public const ViewBrands = 'content_brands.view';
 
     public const ManageBrands = 'content_brands.manage';
@@ -66,6 +70,8 @@ class MarketingPermission
             self::ViewNotificationLogs => 'Ver historial de envíos y fallas',
             self::ViewClientGroups => 'Ver grupos de clientes',
             self::ManageClientGroups => 'Administrar grupos de clientes',
+            self::ViewExternalCompanies => 'Ver externos',
+            self::ManageExternalCompanies => 'Administrar externos',
             self::ViewBrands => 'Ver marcas',
             self::ManageBrands => 'Administrar marcas',
             self::ViewContentPosts => 'Ver tablero de contenido',
@@ -95,6 +101,8 @@ class MarketingPermission
             self::ViewNotificationLogs => 'Auditar entregas, fallos y trazas del API.',
             self::ViewClientGroups => 'Consultar grupos de clientes y responsables.',
             self::ManageClientGroups => 'Registrar clientes y administrar audiencias.',
+            self::ViewExternalCompanies => 'Consultar empresas externas y sus responsables.',
+            self::ManageExternalCompanies => 'Registrar y editar empresas externas para campañas.',
             self::ViewBrands => 'Consultar la ficha y los recursos fijos de cada marca.',
             self::ManageBrands => 'Crear y editar marcas, bóveda de CTAs, hashtags y enlaces.',
             self::ViewContentPosts => 'Acceder al panel máster, Kanban y calendario de contenido.',
@@ -172,11 +180,13 @@ class MarketingPermission
             $buildGroup(
                 key: 'audiences',
                 label: 'Audiencias TDG',
-                description: 'Grupos de clientes y contactos para campañas.',
+                description: 'Grupos de clientes, empresas externas y contactos para campañas.',
                 icon: 'heroicon-o-user-group',
                 permissions: [
                     self::ViewClientGroups,
                     self::ManageClientGroups,
+                    self::ViewExternalCompanies,
+                    self::ManageExternalCompanies,
                 ],
             ),
             $buildGroup(

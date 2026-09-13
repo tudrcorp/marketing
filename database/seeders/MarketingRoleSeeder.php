@@ -37,6 +37,8 @@ class MarketingRoleSeeder extends Seeder
                     MarketingPermission::ViewNotificationLogs,
                     MarketingPermission::ViewClientGroups,
                     MarketingPermission::ManageClientGroups,
+                    MarketingPermission::ViewExternalCompanies,
+                    MarketingPermission::ManageExternalCompanies,
                     MarketingPermission::ViewBrands,
                     MarketingPermission::ManageBrands,
                     MarketingPermission::ViewContentPosts,

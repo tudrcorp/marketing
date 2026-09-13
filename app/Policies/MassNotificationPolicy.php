@@ -31,6 +31,15 @@ class MassNotificationPolicy
         return $this->allows($user, MarketingPermission::ManageMassNotifications);
     }
 
+    /**
+     * Permite ofrecer el envío de campañas ya creadas sin tener un registro concreto
+     * (por ejemplo, la acción masiva desde la tabla de externos).
+     */
+    public function sendAny(User $user): bool
+    {
+        return $this->allows($user, MarketingPermission::ManageMassNotifications);
+    }
+
     public function sendTest(User $user, MassNotification $massNotification): bool
     {
         return $this->allows($user, MarketingPermission::ManageMassNotifications);

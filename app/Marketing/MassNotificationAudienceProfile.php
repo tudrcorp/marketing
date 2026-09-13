@@ -103,6 +103,7 @@ readonly class MassNotificationAudienceProfile
                 nameFields: ['name', 'razon_social'],
             ),
             BirthdayNotificationAudience::ClientGroups => throw new \LogicException('Los grupos de clientes se resuelven con ClientGroupContactCollector.'),
+            BirthdayNotificationAudience::Externals => throw new \LogicException('Los externos se resuelven con ExternalCompanyContactCollector.'),
         };
     }
 }

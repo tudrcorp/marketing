@@ -80,6 +80,18 @@ it('configures light theme depth and contrast in the marketing theme', function 
         ->toContain('inset 3px 3px 8px rgb(103 111 157 / 0.14)');
 });
 
+it('rounds the modal header and footer so the corners match in both themes', function () {
+    $theme = file_get_contents(resource_path('css/filament/marketing/theme.css'));
+
+    // El encabezado y el pie tienen fondo propio en el tema claro y tapaban el radio de
+    // la ventana; la regla no se limita a un tema para que ambos se vean igual.
+    expect($theme)
+        ->toContain('> .fi-modal-header {')
+        ->toContain('@apply rounded-t-xl;')
+        ->toContain('> .fi-modal-footer {')
+        ->toContain('@apply rounded-b-xl;');
+});
+
 it('configures ios glass inputs and buttons in the marketing theme', function () {
     $theme = file_get_contents(resource_path('css/filament/marketing/theme.css'));
 

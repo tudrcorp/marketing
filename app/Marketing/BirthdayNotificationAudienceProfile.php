@@ -75,7 +75,8 @@ readonly class BirthdayNotificationAudienceProfile
             BirthdayNotificationAudience::Doctors,
             BirthdayNotificationAudience::NaturalSuppliers,
             BirthdayNotificationAudience::LegalSuppliers,
-            BirthdayNotificationAudience::ClientGroups => null,
+            BirthdayNotificationAudience::ClientGroups,
+            BirthdayNotificationAudience::Externals => null,
         };
     }
 }
